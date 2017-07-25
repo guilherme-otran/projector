@@ -78,12 +78,18 @@ public class ProjectionWindow implements Runnable, CanvasDelegate {
     }
 
     public void setDevice(GraphicsDevice device) {
-        stopEngine();
-        this.currentDevice = device;
-        startEngine();
+        try {
+            stopEngine();
+            this.currentDevice = device;
+            startEngine();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InvocationTargetException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 
-    private void stopEngine() {
+    private void stopEngine() throws InterruptedException, InvocationTargetException {
         running = false;
 
         if (drawThread != null) {
@@ -91,70 +97,64 @@ public class ProjectionWindow implements Runnable, CanvasDelegate {
             drawThread = null;
         }
 
-        if (frame != null) {
-            final Frame f = frame;
-            
-            SwingUtilities.invokeLater(new Runnable(){
-                @Override
-                public void run() {
-                    f.setVisible(false);
-                    f.dispose();
+        SwingUtilities.invokeAndWait(new Runnable(){
+            @Override
+            public void run() {
+                if (frame != null) {
+                    frame.setVisible(false);
                 }
-            });
+                if (currentDevice != null) {
+                    currentDevice.setFullScreenWindow(null);
+                }
+            }
+        });
             
-            frame = null;
-        }
-        
         preview.setProjectionCanvas(null);
     }
 
-    private void startEngine() {
-        if (starting) {
+    private void startEngine() throws InterruptedException, InvocationTargetException {
+        if (currentDevice == null) {
             return;
         }
         
-        if (currentDevice != null) {
-            frame = new JFrame(currentDevice.getDefaultConfiguration());
-            
-            frame.setExtendedState(Frame.MAXIMIZED_BOTH);
-            frame.setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-            frame.setUndecorated(true);
-            frame.setIgnoreRepaint(true);
-            frame.setLayout(null);
-            frame.setCursor(blankCursor);
-            
-            if (OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
-                if (fullScreen) {
-                    setWindowCanFullScreen(frame, true);
+        SwingUtilities.invokeAndWait(new Runnable(){
+            @Override
+            public void run() {
+                if (frame == null) {
+                    frame = new JFrame();
+                    frame.setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+                    frame.setUndecorated(true);
+                    frame.setIgnoreRepaint(true);
+                    frame.setLayout(null);
+                    frame.setCursor(blankCursor);
                 }
-            } else {
+
                 Rectangle displayRect = currentDevice.getDefaultConfiguration().getBounds();
                 frame.setBounds(displayRect);
-            }
-            
-            starting = true;
-            
-            SwingUtilities.invokeLater(new Runnable(){
-                @Override
-                public void run() {
-                    frame.setVisible(true);
-                    
-                    if (fullScreen) {
-                        currentDevice.setFullScreenWindow(frame);
-                    }
-                    
-                    frame.createBufferStrategy(2);
-            
-                    projectionCanvas.init();
-                    preview.setProjectionCanvas(projectionCanvas);
+                frame.setExtendedState(Frame.MAXIMIZED_BOTH);
 
-                    running = true;
-                    drawThread = new Thread(ProjectionWindow.this);
-                    drawThread.start();
-                    starting = false;
+                if (OsCheck.getOperatingSystemType() == OsCheck.OSType.MacOS) {
+                    setWindowCanFullScreen(frame, fullScreen);
+                } else {
+                    frame.setAlwaysOnTop(fullScreen);
                 }
-            });
-        }
+
+                frame.setVisible(true);
+
+                if (fullScreen) {
+                    currentDevice.setFullScreenWindow(frame);
+                }
+
+                frame.createBufferStrategy(2);
+
+                projectionCanvas.init();
+                preview.setProjectionCanvas(projectionCanvas);
+
+                running = true;
+                drawThread = new Thread(ProjectionWindow.this);
+                drawThread.start();
+            }
+        });
     }
 
     @Override
@@ -203,17 +203,33 @@ public class ProjectionWindow implements Runnable, CanvasDelegate {
 
     @Override
     public void setFullScreen(boolean fullScreen) {
-        if (this.fullScreen == fullScreen) {
-            return;
+        try {
+            if (this.fullScreen == fullScreen) {
+                return;
+            }
+            
+            stopEngine();
+            this.fullScreen = fullScreen;
+            startEngine();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InvocationTargetException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
         }
-
-        stopEngine();
-        this.fullScreen = fullScreen;
-        startEngine();
     }
 
     public void stop() {
-        stopEngine();
+        try {
+            stopEngine();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InvocationTargetException ex) {
+            Logger.getLogger(ProjectionWindow.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        if (frame != null) {
+            frame.dispose();
+        }
     }
 
     @Override
