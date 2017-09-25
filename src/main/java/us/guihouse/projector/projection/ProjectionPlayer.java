@@ -32,6 +32,13 @@ public class ProjectionPlayer implements Projectable {
     private BufferedImage image;
     private final MediaPlayerFactory factory;
 
+    private int width;
+    private int height;
+
+    private int previewW;
+    private int previewH;
+    private int previewY;
+
     public ProjectionPlayer(CanvasDelegate delegate) {
         this.delegate = delegate;
 
@@ -50,9 +57,6 @@ public class ProjectionPlayer implements Projectable {
 
     @Override
     public void rebuildLayout() {
-        int width;
-        int height;
-
         if (this.player != null) {
             this.player.release();
         }
@@ -61,17 +65,17 @@ public class ProjectionPlayer implements Projectable {
 
         if (device == null) {
             device = delegate.getDefaultDevice();
-            width = device.getDefaultConfiguration().getBounds().width;
-            height = device.getDefaultConfiguration().getBounds().height;
+            this.width = device.getDefaultConfiguration().getBounds().width;
+            this.height = device.getDefaultConfiguration().getBounds().height;
         } else {
-            width = delegate.getWidth();
-            height = delegate.getHeight();
+            this.width = delegate.getWidth();
+            this.height = delegate.getHeight();
         }
 
         image = device.getDefaultConfiguration().createCompatibleImage(width, height);
         image.setAccelerationPriority(1.0f);
 
-        this.player = factory.newDirectMediaPlayer(new MyBufferFormatCallback(), new MyRenderCallback());
+        this.player = factory.newDirectMediaPlayer(new MyBufferFormatCallback(width, height), new MyRenderCallback());
     }
 
     @Override
@@ -90,13 +94,18 @@ public class ProjectionPlayer implements Projectable {
         return player;
     }
 
-    public JPanel getPreviewPanel() {
+    public JComponent getPreviewPanel() {
         return panel;
     }
 
     public void setPreviewPanelSize(double dw, double dh) {
         int w = (int) Math.round(dw);
         int h = (int) Math.round(dh);
+
+        previewW = w;
+        previewH = (int) Math.round((this.height / (double) this.width) * w);
+
+        previewY = (h - previewH) / 2;
 
         panel.setBounds(0,0, w, h);
         panel.repaint();
@@ -115,14 +124,20 @@ public class ProjectionPlayer implements Projectable {
     }
 
     private final class MyBufferFormatCallback implements BufferFormatCallback {
+        private int w;
+        private int h;
 
+        MyBufferFormatCallback(int w, int h) {
+            this.w = w;
+            this.h = h;
+        }
         @Override
         public BufferFormat getBufferFormat(int sourceWidth, int sourceHeight) {
-            return new RV32BufferFormat(delegate.getWidth(), delegate.getHeight());
+            return new RV32BufferFormat(w, h);
         }
     }
 
-    private final class PlayerPanel extends JPanel {
+    private final class PlayerPanel extends JComponent {
 
         private BufferedImage image;
 
@@ -133,10 +148,7 @@ public class ProjectionPlayer implements Projectable {
         @Override
         public void paint(Graphics g) {
             super.paint(g);
-            g.setColor(Color.red);
-
-            g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
-            g.fillRect(0, 0, getWidth(), getHeight());
+            g.drawImage(image, 0, previewY, previewW, previewH, null);
         }
     }
 }

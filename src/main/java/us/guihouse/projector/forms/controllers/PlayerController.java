@@ -11,6 +11,7 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.embed.swing.SwingNode;
 import javafx.fxml.FXML;
+import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -19,6 +20,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Box;
+import us.guihouse.projector.other.ResizeableSwingNode;
 import us.guihouse.projector.projection.ProjectionManager;
 import us.guihouse.projector.projection.ProjectionPlayer;
 
@@ -46,7 +48,7 @@ public class PlayerController extends ProjectionController {
     private Button endProjectionButton;
 
     @FXML
-    private AnchorPane playerPane;
+    private Group playerGroup;
 
     @FXML
     private Pane playerContainer;
@@ -76,6 +78,8 @@ public class PlayerController extends ProjectionController {
     @FXML
     private ToggleButton withSoundButton;
 
+    private SwingNode node;
+
     @FXML
     public void onBeginProjection() {
         beginProjectionButton.disableProperty().set(true);
@@ -95,30 +99,24 @@ public class PlayerController extends ProjectionController {
         super.initWithProjectionManager(projectionManager);
         this.projectionPlayer = projectionManager.createPlayer();
 
-        SwingNode node = new SwingNode();
+        playerGroup.setAutoSizeChildren(false);
+
+        node = new ResizeableSwingNode();
         node.setContent(projectionPlayer.getPreviewPanel());
+        playerGroup.getChildren().add(node);
 
-        playerPane.getChildren().add(node);
-
-        playerContainer.widthProperty().addListener(new ChangeListener() {
+        ChangeListener listener = new ChangeListener() {
             @Override
             public void changed(ObservableValue observable, Object oldValue, Object newValue) {
-                node.resize(playerPane.getWidth(), playerPane.getHeight());
-                projectionPlayer.setPreviewPanelSize(playerPane.getWidth(), playerPane.getHeight());
+                node.resize(playerContainer.getWidth(), playerContainer.getHeight());
+                projectionPlayer.setPreviewPanelSize(playerContainer.getWidth(), playerContainer.getHeight());
             }
-        });
+        };
 
-        playerContainer.heightProperty().addListener(new ChangeListener() {
-            @Override
-            public void changed(ObservableValue observable, Object oldValue, Object newValue) {
-                node.resize(playerPane.getWidth(), playerPane.getHeight());
-                projectionPlayer.setPreviewPanelSize(playerPane.getWidth(), playerPane.getHeight());
-            }
-        });
+        playerContainer.widthProperty().addListener(listener);
+        playerContainer.heightProperty().addListener(listener);
 
-
-
-        //projectionPlayer.getPlayer().playMedia("/home/guilherme/projects/twns-demo.ogv");
+        projectionPlayer.getPlayer().prepareMedia("/Users/guilherme/Desktop/ABERTURA.mp4");
     }
 
     @Override
@@ -130,22 +128,22 @@ public class PlayerController extends ProjectionController {
 
     @FXML
     public void beginButtonClick() {
-
+        projectionPlayer.getPlayer().setPosition(0);
     }
 
     @FXML
     public void playButtonClick() {
-
+        projectionPlayer.getPlayer().play();
     }
 
     @FXML
     public void pauseButtonClick() {
-
+        projectionPlayer.getPlayer().pause();
     }
 
     @FXML
     public void stopButtonClick() {
-
+        projectionPlayer.getPlayer().stop();
     }
 
     @FXML

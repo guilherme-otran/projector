@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.sun.jna.NativeLibrary;
 import javafx.application.Application;
 import javafx.event.EventHandler;
 import javafx.fxml.FXMLLoader;
@@ -34,6 +36,7 @@ public class Projector extends Application {
      * @param args the command line arguments
      */
     public static void main(String args[]) {
+        NativeLibrary.addSearchPath("vlc", "/Applications/VLC.app/Contents/MacOS/lib/");
         launch(args);
     }
 
