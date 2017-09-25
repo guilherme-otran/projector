@@ -5,7 +5,6 @@
  */
 package us.guihouse.projector.forms.controllers;
 
-import javafx.beans.property.BooleanProperty;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.control.Menu;
@@ -39,7 +38,7 @@ public class GraphicsDeviceHelper {
     public ProjectionManager getProjectionManager() {
         return projectionWindow.getManager();
     }
-    
+
     void stop() {
         projectionWindow.stop();
     }
@@ -49,6 +48,9 @@ public class GraphicsDeviceHelper {
         projectionScreenMenu.getItems().add(reloadItem);
 
         ToggleGroup group = new ToggleGroup();
+
+        GraphicsFinder.Device defaulDevice = GraphicsFinder.getDefaultDevice();
+        projectionWindow.setDefaultDevice(defaulDevice.getDevice());
 
         GraphicsFinder.getAvailableDevices().stream().map((GraphicsFinder.Device dev) -> {
             return buildItem(dev);
@@ -101,7 +103,7 @@ public class GraphicsDeviceHelper {
     private void buildProjectionFrame() {
         projectionWindow = new ProjectionWindow(settingsService);
     }
-    
+
     public JPanel getPreviewPanel() {
         return projectionWindow.getPreviewPanel();
     }
