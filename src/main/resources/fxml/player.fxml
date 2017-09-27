@@ -1,61 +1,109 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.Group?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.ToggleButton?>
 <?import javafx.scene.control.ToggleGroup?>
-<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<?import javafx.scene.Group?>
-<VBox id="RootBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="us.guihouse.projector.forms.controllers.PlayerController">
+<VBox id="RootBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.131" xmlns:fx="http://javafx.com/fxml/1" fx:controller="us.guihouse.projector.forms.controllers.PlayerController">
     <children>
-        <HBox prefHeight="28.0" prefWidth="600.0" VBox.vgrow="NEVER">
-            <children>
-                <Button fx:id="beginProjectionButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onBeginProjection" text="Projetar na Tela" HBox.hgrow="ALWAYS">
-                    <HBox.margin>
-                        <Insets />
-                    </HBox.margin>
-                </Button>
-                <Button fx:id="endProjectionButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onEndProjection" text="Interromper Projeção (ESC)" HBox.hgrow="ALWAYS" />
-            </children>
-        </HBox>
-      <Pane fx:id="playerContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+    	<VBox fx:id="chooseFileBox" alignment="TOP_CENTER">
+	        <Label fx:id="dragDropLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="126.0" layoutY="200.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Arraste e solte aqui uma imagem para ser projetada." textAlignment="CENTER" underline="true" VBox.vgrow="NEVER">
+	           <VBox.margin>
+	               <Insets top="10.0" />
+	           </VBox.margin>
+            <font>
+               <Font size="14.0" />
+            </font>
+	        </Label>
+         <Label fx:id="dragDropLabel1" alignment="CENTER" contentDisplay="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="OU" textAlignment="CENTER">
+            <font>
+               <Font name="System Bold" size="16.0" />
+            </font>
+            <VBox.margin>
+               <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+            </VBox.margin>
+         </Label>
+         <Button mnemonicParsing="false" text="Selecione um arquivo" textAlignment="CENTER" VBox.vgrow="NEVER">
+            <VBox.margin>
+               <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+            </VBox.margin>
+            <font>
+               <Font size="14.0" />
+            </font>
+         </Button>
+	    </VBox>
+      <VBox fx:id="playerBox" prefHeight="200.0" prefWidth="100.0" VBox.vgrow="ALWAYS">
          <children>
-            <Group fx:id="playerGroup" style="-fx-border-color: #AAAAAA;" />
+   	        <HBox VBox.vgrow="NEVER">
+   	            <children>
+   	                <Button fx:id="beginProjectionButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onBeginProjection" text="Projetar na Tela" HBox.hgrow="ALWAYS">
+   	                    <HBox.margin>
+   	                        <Insets />
+   	                    </HBox.margin>
+   	                </Button>
+   	                <Button fx:id="endProjectionButton" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onEndProjection" text="Interromper Projeção (ESC)" HBox.hgrow="ALWAYS" />
+   	            </children>
+   	        </HBox>
+   	      <Pane fx:id="playerContainer" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
+   	         <children>
+   	            <Group fx:id="playerGroup" style="-fx-border-color: #AAAAAA;" />
+   	         </children>
+   	         <VBox.margin>
+   	            <Insets bottom="5.0" top="5.0" />
+   	         </VBox.margin>
+   	      </Pane>
+   	        <HBox VBox.vgrow="NEVER">
+   	            <children>
+   	                <Button fx:id="beginButton" mnemonicParsing="false" onAction="#beginButtonClick" HBox.hgrow="NEVER">
+                     <graphic>
+                        <ImageView fitHeight="10.0" fitWidth="10.0">
+                           <image>
+                              <Image url="@../icons/icon-pause.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </Button>
+   	                <Button fx:id="playButton" mnemonicParsing="false" onAction="#playButtonClick" text="▶" HBox.hgrow="NEVER" />
+   	                <Button fx:id="pauseButton" mnemonicParsing="false" onAction="#pauseButtonClick" HBox.hgrow="NEVER">
+                     <graphic>
+                        <ImageView fitHeight="10.0" fitWidth="10.0">
+                           <image>
+                              <Image url="@../icons/icon-rewind.png" />
+                           </image>
+                        </ImageView>
+                     </graphic>
+                  </Button>
+   	                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" text="◼" HBox.hgrow="NEVER" />
+   	                <Slider fx:id="timeBar" HBox.hgrow="ALWAYS">
+   	                    <HBox.margin>
+   	                        <Insets bottom="5.0" left="5.0" top="5.0" />
+   	                    </HBox.margin>
+   	                </Slider>
+   	                <Label fx:id="timeLabel" text="1m20s">
+   	                    <HBox.margin>
+   	                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+   	                    </HBox.margin>
+   	                </Label>
+   	                <ToggleButton fx:id="withoutSoundButton" mnemonicParsing="false" onAction="#withoutSoundButtonClick" selected="true" text="Sem Som" HBox.hgrow="NEVER">
+   	                    <toggleGroup>
+   	                        <ToggleGroup fx:id="soundToggle" />
+   	                    </toggleGroup>
+   	                </ToggleButton>
+   	                <ToggleButton fx:id="withSoundButton" mnemonicParsing="false" onAction="#withSoundButtonClick" text="Com Som" toggleGroup="$soundToggle" />
+   	            </children>
+   	        </HBox>
          </children>
-         <VBox.margin>
-            <Insets bottom="5.0" top="5.0" />
-         </VBox.margin>
-      </Pane>
-        <HBox VBox.vgrow="NEVER">
-            <children>
-                <Button fx:id="beginButton" mnemonicParsing="false" onAction="#beginButtonClick" text="⏮" HBox.hgrow="NEVER" />
-                <Button fx:id="playButton" mnemonicParsing="false" onAction="#playButtonClick" text="▶" HBox.hgrow="NEVER" />
-                <Button fx:id="pauseButton" mnemonicParsing="false" onAction="#pauseButtonClick" text="⏸" HBox.hgrow="NEVER" />
-                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" text="◼" HBox.hgrow="NEVER" />
-                <Slider fx:id="timeBar" HBox.hgrow="ALWAYS">
-                    <HBox.margin>
-                        <Insets bottom="5.0" left="5.0" top="5.0" />
-                    </HBox.margin>
-                </Slider>
-                <Label fx:id="timeLabel" text="1m20s">
-                    <HBox.margin>
-                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                    </HBox.margin>
-                </Label>
-                <ToggleButton fx:id="withoutSoundButton" mnemonicParsing="false" onAction="#withoutSoundButtonClick" selected="true" text="Sem Som" HBox.hgrow="NEVER">
-                    <toggleGroup>
-                        <ToggleGroup fx:id="soundToggle" />
-                    </toggleGroup>
-                </ToggleButton>
-                <ToggleButton fx:id="withSoundButton" mnemonicParsing="false" onAction="#withSoundButtonClick" text="Com Som" toggleGroup="$soundToggle" />
-            </children>
-        </HBox>
+      </VBox>
     </children>
     <padding>
         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />

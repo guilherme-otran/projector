@@ -20,6 +20,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Box;
+import javafx.scene.layout.VBox;
 import us.guihouse.projector.other.ResizeableSwingNode;
 import us.guihouse.projector.projection.ProjectionManager;
 import us.guihouse.projector.projection.ProjectionPlayer;
@@ -41,6 +42,12 @@ public class PlayerController extends ProjectionController {
 
     private ProjectionPlayer projectionPlayer;
 
+    @FXML
+    private VBox chooseFileBox;
+    
+    @FXML
+    private VBox playerBox;
+    
     @FXML
     private Button beginProjectionButton;
 
@@ -116,7 +123,9 @@ public class PlayerController extends ProjectionController {
         playerContainer.widthProperty().addListener(listener);
         playerContainer.heightProperty().addListener(listener);
 
-        projectionPlayer.getPlayer().prepareMedia("/Users/guilherme/Desktop/ABERTURA.mp4");
+        //projectionPlayer.getPlayer().prepareMedia("/Users/guilherme/Desktop/ABERTURA.mp4");
+        playerBox.setVisible(false);
+        chooseFileBox.setVisible(true);
     }
 
     @Override
