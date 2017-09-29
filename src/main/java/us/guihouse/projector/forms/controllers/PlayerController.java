@@ -14,16 +14,20 @@ import javafx.fxml.FXML;
 import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.layout.AnchorPane;
+import javafx.scene.input.DragEvent;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.Pane;
-import javafx.scene.shape.Box;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import us.guihouse.projector.other.ResizeableSwingNode;
 import us.guihouse.projector.projection.ProjectionManager;
 import us.guihouse.projector.projection.ProjectionPlayer;
+import us.guihouse.projector.services.FileDragDropService;
 
 /**
  * FXML Controller class
@@ -31,7 +35,7 @@ import us.guihouse.projector.projection.ProjectionPlayer;
  * @author guilherme
  */
 public class PlayerController extends ProjectionController {
-
+    private FileDragDropService service;
     /**
      * Initializes the controller class.
      */
@@ -41,19 +45,26 @@ public class PlayerController extends ProjectionController {
     }
 
     private ProjectionPlayer projectionPlayer;
-
+    
+    // Drag and drop
+    @FXML
+    private Label dragDropLabel;
+    
     @FXML
     private VBox chooseFileBox;
     
     @FXML
     private VBox playerBox;
     
+    private String oldLabelText;
+    
+    // Controls
     @FXML
     private Button beginProjectionButton;
 
     @FXML
     private Button endProjectionButton;
-
+    
     @FXML
     private Group playerGroup;
 
@@ -104,6 +115,7 @@ public class PlayerController extends ProjectionController {
     @Override
     public void initWithProjectionManager(ProjectionManager projectionManager) {
         super.initWithProjectionManager(projectionManager);
+        this.oldLabelText = dragDropLabel.getText();
         this.projectionPlayer = projectionManager.createPlayer();
 
         playerGroup.setAutoSizeChildren(false);
@@ -163,5 +175,34 @@ public class PlayerController extends ProjectionController {
     @FXML
     public void withSoundButtonClick() {
 
+    }
+    
+    // Drag and drop
+    @FXML
+    public void onDragOver(DragEvent event) {
+        service.onDragOver(event);
+    }
+    
+    @FXML
+    public void onDragExit() {
+        setOriginal();
+        dragDropLabel.setVisible(false);        
+        service.onDragExit();
+    }
+    
+    @FXML
+    public void onDragDropped(DragEvent event) {
+        service.onDragDropped(event);
+    }
+        
+    private void setError(String error) {
+        dragDropLabel.setVisible(true);
+        dragDropLabel.setText(error);
+        chooseFileBox.setBorder(new Border(new BorderStroke(Color.RED, BorderStrokeStyle.SOLID, null, new BorderWidths(3))));
+    }
+    
+    private void setOriginal() {
+        dragDropLabel.setText(oldLabelText);
+        chooseFileBox.setBorder(null);
     }
 }

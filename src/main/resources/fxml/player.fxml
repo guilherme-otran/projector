@@ -16,7 +16,7 @@
 
 <VBox id="RootBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.131" xmlns:fx="http://javafx.com/fxml/1" fx:controller="us.guihouse.projector.forms.controllers.PlayerController">
     <children>
-    	<VBox fx:id="chooseFileBox" alignment="TOP_CENTER">
+    	<VBox fx:id="chooseFileBox" alignment="TOP_CENTER" onDragDropped="#onDragDropped" onDragExited="#onDragExit" onDragOver="#onDragOver">
 	        <Label fx:id="dragDropLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="126.0" layoutY="200.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Arraste e solte aqui um vídeo para ser projetado." textAlignment="CENTER" underline="true" VBox.vgrow="NEVER">
 	           <VBox.margin>
 	               <Insets top="10.0" />
@@ -25,7 +25,7 @@
                <Font size="14.0" />
             </font>
 	        </Label>
-         <Label fx:id="dragDropLabel1" alignment="CENTER" contentDisplay="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="OU" textAlignment="CENTER">
+         <Label alignment="CENTER" contentDisplay="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="OU" textAlignment="CENTER">
             <font>
                <Font name="System Bold" size="16.0" />
             </font>
