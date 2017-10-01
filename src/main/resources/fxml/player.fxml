@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.Group?>
 <?import javafx.scene.control.Button?>
@@ -13,36 +20,39 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import javafx.scene.layout.AnchorPane?>
 
-<VBox id="RootBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.131" xmlns:fx="http://javafx.com/fxml/1" fx:controller="us.guihouse.projector.forms.controllers.PlayerController">
+<AnchorPane id="rootBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="us.guihouse.projector.forms.controllers.PlayerController">
     <children>
-    	<VBox fx:id="chooseFileBox" alignment="TOP_CENTER" onDragDropped="#onDragDropped" onDragExited="#onDragExit" onDragOver="#onDragOver">
-	        <Label fx:id="dragDropLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="126.0" layoutY="200.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Arraste e solte aqui um vídeo para ser projetado." textAlignment="CENTER" underline="true" VBox.vgrow="NEVER">
-	           <VBox.margin>
-	               <Insets top="10.0" />
-	           </VBox.margin>
-            <font>
-               <Font size="14.0" />
-            </font>
-	        </Label>
-         <Label alignment="CENTER" contentDisplay="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="OU" textAlignment="CENTER">
-            <font>
-               <Font name="System Bold" size="16.0" />
-            </font>
-            <VBox.margin>
-               <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
-            </VBox.margin>
-         </Label>
-         <Button mnemonicParsing="false" text="Selecione um arquivo" textAlignment="CENTER" VBox.vgrow="NEVER">
-            <VBox.margin>
-               <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-            </VBox.margin>
-            <font>
-               <Font size="14.0" />
-            </font>
-         </Button>
+    	<VBox fx:id="chooseFileBox" alignment="TOP_CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" onDragDropped="#onDragDropped" onDragExited="#onDragExit" onDragOver="#onDragOver" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+       <children>
+   	        <Label fx:id="dragDropLabel" alignment="CENTER" contentDisplay="CENTER" layoutX="126.0" layoutY="200.0" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Arraste e solte aqui um vídeo para ser projetado." textAlignment="CENTER" underline="true" VBox.vgrow="NEVER">
+   	           <VBox.margin>
+   	               <Insets top="10.0" />
+   	           </VBox.margin>
+               <font>
+                  <Font size="14.0" />
+               </font>
+   	        </Label>
+            <Label alignment="CENTER" contentDisplay="CENTER" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="OU" textAlignment="CENTER">
+               <font>
+                  <Font name="System Bold" size="16.0" />
+               </font>
+               <VBox.margin>
+                  <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+               </VBox.margin>
+            </Label>
+            <Button mnemonicParsing="false" onAction="#selectFileClick" text="Selecione um arquivo" textAlignment="CENTER" VBox.vgrow="NEVER">
+               <VBox.margin>
+                  <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+               </VBox.margin>
+               <font>
+                  <Font size="14.0" />
+               </font>
+            </Button>
+       </children>
 	    </VBox>
-      <VBox fx:id="playerBox" prefHeight="200.0" prefWidth="100.0" VBox.vgrow="ALWAYS">
+      <VBox fx:id="playerBox" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="200.0" prefWidth="100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" VBox.vgrow="ALWAYS">
          <children>
    	        <HBox VBox.vgrow="NEVER">
    	            <children>
@@ -64,32 +74,35 @@
    	      </Pane>
    	        <HBox VBox.vgrow="NEVER">
    	            <children>
-   	                <Button fx:id="beginButton" mnemonicParsing="false" onAction="#beginButtonClick" HBox.hgrow="NEVER">
+   	                <Button fx:id="beginButton" mnemonicParsing="false" onAction="#beginButtonClick" prefHeight="28.0" prefWidth="28.0" HBox.hgrow="NEVER">
                      <graphic>
-                        <ImageView fitHeight="10.0" fitWidth="10.0">
-                           <image>
-                              <Image url="@../icons/icon-pause.png" />
-                           </image>
-                        </ImageView>
+						 <ImageView fitHeight="10.0" fitWidth="10.0">
+							 <image>
+								 <Image url="@../icons/icon-rewind.png" />
+							 </image>
+						 </ImageView>
                      </graphic>
                   </Button>
-   	                <Button fx:id="playButton" mnemonicParsing="false" onAction="#playButtonClick" text="▶" HBox.hgrow="NEVER" />
-   	                <Button fx:id="pauseButton" mnemonicParsing="false" onAction="#pauseButtonClick" HBox.hgrow="NEVER">
+   	                <Button fx:id="playButton" mnemonicParsing="false" onAction="#playButtonClick" prefHeight="28.0" prefWidth="28.0" text="▶" HBox.hgrow="NEVER">
+                     <font>
+                        <Font size="12.0" />
+                     </font></Button>
+   	                <Button fx:id="pauseButton" mnemonicParsing="false" onAction="#pauseButtonClick" prefHeight="28.0" prefWidth="28.0" HBox.hgrow="NEVER">
                      <graphic>
-                        <ImageView fitHeight="10.0" fitWidth="10.0">
-                           <image>
-                              <Image url="@../icons/icon-rewind.png" />
-                           </image>
-                        </ImageView>
+						 <ImageView fitHeight="10.0" fitWidth="10.0">
+							 <image>
+								 <Image url="@../icons/icon-pause.png" />
+							 </image>
+						 </ImageView>
                      </graphic>
                   </Button>
-   	                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" text="◼" HBox.hgrow="NEVER" />
-   	                <Slider fx:id="timeBar" HBox.hgrow="ALWAYS">
+   	                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" prefHeight="28.0" prefWidth="28.0" HBox.hgrow="NEVER" />
+   	                <Slider fx:id="timeBar" blockIncrement="0.05" max="1.0" HBox.hgrow="ALWAYS">
    	                    <HBox.margin>
    	                        <Insets bottom="5.0" left="5.0" top="5.0" />
    	                    </HBox.margin>
    	                </Slider>
-   	                <Label fx:id="timeLabel" text="1m20s">
+   	                <Label fx:id="timeLabel" text="00:00:00">
    	                    <HBox.margin>
    	                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
    	                    </HBox.margin>
@@ -108,4 +121,4 @@
     <padding>
         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
     </padding>
-</VBox>
+</AnchorPane>
