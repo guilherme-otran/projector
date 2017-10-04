@@ -39,6 +39,8 @@ public class Projector extends Application {
         NativeLibrary.addSearchPath("vlc", "/Applications/VLC.app/Contents/MacOS/lib/");
         
         //TODO: No windows PRECISA setar a ENV VLC_PLUGIN_PATH
+        // Ver https://github.com/java-native-access/jna
+        Runtime.getRuntime().exec()
         NativeLibrary.addSearchPath("libvlc", "C:\\temp\\vlc");
         
         launch(args);
