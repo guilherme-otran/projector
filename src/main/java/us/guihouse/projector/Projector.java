@@ -37,6 +37,10 @@ public class Projector extends Application {
      */
     public static void main(String args[]) {
         NativeLibrary.addSearchPath("vlc", "/Applications/VLC.app/Contents/MacOS/lib/");
+        
+        //TODO: No windows PRECISA setar a ENV VLC_PLUGIN_PATH
+        NativeLibrary.addSearchPath("libvlc", "C:\\temp\\vlc");
+        
         launch(args);
     }
 
