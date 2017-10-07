@@ -96,7 +96,14 @@
 						 </ImageView>
                      </graphic>
                   </Button>
-   	                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" prefHeight="28.0" prefWidth="28.0" HBox.hgrow="NEVER" />
+   	                <Button fx:id="stopButton" mnemonicParsing="false" onAction="#stopButtonClick" prefHeight="28.0" prefWidth="28.0" HBox.hgrow="NEVER">
+                     <graphic>
+                        <ImageView fitHeight="15.0" fitWidth="15.0">
+                           <image>
+                              <Image url="@../icons/icon-stop.png" />
+                           </image>
+                        </ImageView>
+                     </graphic></Button>
    	                <Slider fx:id="timeBar" blockIncrement="0.05" max="1.0" HBox.hgrow="ALWAYS">
    	                    <HBox.margin>
    	                        <Insets bottom="5.0" left="5.0" top="5.0" />
