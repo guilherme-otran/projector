@@ -5,10 +5,12 @@
  */
 package us.guihouse.projector.forms.controllers;
 
+import java.awt.*;
 import java.io.File;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.ResourceBundle;
 
@@ -83,9 +85,6 @@ public class PlayerController extends ProjectionController implements FileDragDr
 
     // Player controls
     @FXML
-    private Button beginButton;
-
-    @FXML
     private Button playButton;
 
     @FXML
@@ -96,8 +95,8 @@ public class PlayerController extends ProjectionController implements FileDragDr
 
     @FXML
     private Slider timeBar;
+    private boolean automaticMoving;
     private boolean manualMoving;
-    private boolean automaMoving;
 
     @FXML
     private Label timeLabel;
@@ -167,11 +166,6 @@ public class PlayerController extends ProjectionController implements FileDragDr
         timeBar.valueChangingProperty().addListener(new ChangeListener<Boolean>() {
             @Override
             public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
-                if (automaMoving) {
-                    manualMoving = false;
-                    return;
-                }
-
                 manualMoving = newValue;
             }
         });
@@ -179,7 +173,7 @@ public class PlayerController extends ProjectionController implements FileDragDr
         timeBar.valueProperty().addListener(new ChangeListener<Number>() {
             @Override
             public void changed(ObservableValue<? extends Number> observable, Number oldValue, Number newValue) {
-                if (manualMoving) {
+                if (!automaticMoving) {
                     projectionPlayer.getPlayer().setPosition(timeBar.valueProperty().floatValue());
                 }
             }
@@ -191,11 +185,6 @@ public class PlayerController extends ProjectionController implements FileDragDr
         if (!endProjectionButton.isDisabled()) {
             endProjectionButton.fire();
         }
-    }
-
-    @FXML
-    public void beginButtonClick() {
-        projectionPlayer.getPlayer().setPosition(0);
     }
 
     @FXML
@@ -211,6 +200,7 @@ public class PlayerController extends ProjectionController implements FileDragDr
     @FXML
     public void stopButtonClick() {
         projectionPlayer.getPlayer().stop();
+        projectionPlayer.getPlayer().setPosition(0);
     }
 
     @FXML
@@ -319,7 +309,7 @@ public class PlayerController extends ProjectionController implements FileDragDr
         Platform.runLater(new Runnable(){
 
             @Override
-            public void run() {;
+            public void run() {
                 playButton.disableProperty().set(false);
                 pauseButton.disableProperty().set(true);
                 stopButton.disableProperty().set(false);
@@ -333,7 +323,7 @@ public class PlayerController extends ProjectionController implements FileDragDr
         Platform.runLater(new Runnable(){
 
             @Override
-            public void run() {;
+            public void run() {
                 playButton.disableProperty().set(false);
                 pauseButton.disableProperty().set(true);
                 stopButton.disableProperty().set(true);
@@ -369,10 +359,12 @@ public class PlayerController extends ProjectionController implements FileDragDr
         Platform.runLater(new Runnable(){
 
             @Override
-            public void run() {;
-                Date date = new Date(l);
-                DateFormat formatter = new SimpleDateFormat("HH:mm:ss");
-                timeLabel.setText(formatter.format(date));
+            public void run() {
+                long secs = currentTime % 60;
+                long mins = (currentTime / 60) % 60;
+                long hours = currentTime / 3600;
+
+                timeLabel.setText(String.format("%02d:%02d:%02d", hours, mins, secs));
             }
         });
     }
@@ -387,7 +379,8 @@ public class PlayerController extends ProjectionController implements FileDragDr
                     return;
                 }
 
-                automaMoving = true;
+                automaticMoving = true;
+
                 if (Float.compare(v, 0) < 0) {
                     timeBar.valueProperty().set(0);
                 } else if (Float.compare(v, 1) > 0) {
@@ -395,7 +388,8 @@ public class PlayerController extends ProjectionController implements FileDragDr
                 } else {
                     timeBar.valueProperty().set(v);
                 }
-                automaMoving = false;
+
+                automaticMoving = false;
             }
         });
     }
@@ -517,7 +511,7 @@ public class PlayerController extends ProjectionController implements FileDragDr
 
     @Override
     public void newMedia(MediaPlayer mediaPlayer) {
-
+        notifyTitleChange(mediaPlayer.getMediaMetaData().getTitle());
     }
 
     @Override

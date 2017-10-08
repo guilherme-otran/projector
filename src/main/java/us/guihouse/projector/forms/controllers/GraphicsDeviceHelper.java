@@ -28,14 +28,14 @@ public class GraphicsDeviceHelper {
     private ProjectionWindow projectionWindow;
     private final SettingsService settingsService = new SettingsService();
 
-    public GraphicsDeviceHelper(Menu projectionScreenMenu) {
+    GraphicsDeviceHelper(Menu projectionScreenMenu) {
         this.projectionScreenMenu = projectionScreenMenu;
         buildProjectionFrame();
         buildReloadItem();
         reloadDevices();
     }
 
-    public ProjectionManager getProjectionManager() {
+    ProjectionManager getProjectionManager() {
         return projectionWindow.getManager();
     }
 
@@ -52,17 +52,17 @@ public class GraphicsDeviceHelper {
         GraphicsFinder.Device defaulDevice = GraphicsFinder.getDefaultDevice();
         projectionWindow.setDefaultDevice(defaulDevice.getDevice());
 
-        GraphicsFinder.getAvailableDevices().stream().map((GraphicsFinder.Device dev) -> {
-            return buildItem(dev);
-        }).forEachOrdered((item) -> {
-            item.setToggleGroup(group);
+        GraphicsFinder.getAvailableDevices().stream()
+                .map(this::buildItem)
+                .forEachOrdered((item) -> {
+                    item.setToggleGroup(group);
 
-            if (item.isSelected()) {
-                item.fire();
-            }
+                    if (item.isSelected()) {
+                        item.fire();
+                    }
 
-            projectionScreenMenu.getItems().add(item);
-        });
+                    projectionScreenMenu.getItems().add(item);
+                });
     }
 
     private void changeDevice(final GraphicsFinder.Device device) {
@@ -104,7 +104,7 @@ public class GraphicsDeviceHelper {
         projectionWindow = new ProjectionWindow(settingsService);
     }
 
-    public JPanel getPreviewPanel() {
+    JPanel getPreviewPanel() {
         return projectionWindow.getPreviewPanel();
     }
 }

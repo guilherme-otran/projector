@@ -41,6 +41,8 @@ public class ProjectionCanvas implements ProjectionManager {
         initializeList.forEach(p -> p.init());
     }
 
+    public void finish() { initializeList.forEach(p -> p.finish()); }
+
     protected void paintComponent(Graphics2D g) {
         if (currentProjectable == null) {
             background.paintComponent(g);

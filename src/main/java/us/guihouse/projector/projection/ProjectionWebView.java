@@ -66,6 +66,11 @@ public class ProjectionWebView implements Projectable {
         rebuildLayout();
     }
 
+    @Override
+    public void finish() {
+
+    }
+
     public Dimension getMaxSize() {
         return maxSize;
     }

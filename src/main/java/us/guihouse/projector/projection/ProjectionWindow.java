@@ -208,6 +208,7 @@ public class ProjectionWindow implements Runnable, CanvasDelegate {
 
     public void stop() {
         stopEngine();
+        projectionCanvas.finish();
     }
 
     @Override
