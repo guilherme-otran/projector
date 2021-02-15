@@ -23,7 +23,7 @@ public class RGBImageCopy {
         return 0;
     }
 
-    private static void copyPixel(int argb, ByteBuffer buffer, boolean alphaChannel) {
+    public static void copyPixel(int argb, ByteBuffer buffer, boolean alphaChannel) {
         byte num = toByte((argb >> 16) & 0xFF);
         buffer.put(num);
         num = toByte((argb >> 8) & 0xFF);

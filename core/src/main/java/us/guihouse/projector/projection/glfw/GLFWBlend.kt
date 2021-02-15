@@ -3,6 +3,7 @@ package us.guihouse.projector.projection.glfw
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
+import org.lwjgl.opengl.GL30
 import us.guihouse.projector.models.WindowConfig
 import us.guihouse.projector.models.WindowConfigBlend
 import us.guihouse.projector.utils.BlendGenerator
@@ -12,13 +13,14 @@ class GLFWBlend(private val bounds: Rectangle) {
     private val blendsTex = HashMap<Int, WindowConfigBlend>()
 
     fun render() {
+        GL30.glEnable(GL30.GL_TEXTURE_2D)
         GL11.glMatrixMode(GL11.GL_MODELVIEW)
         GL11.glPushMatrix()
         GL11.glOrtho(0.0, bounds.width.toDouble(), bounds.height.toDouble(), 0.0, 1.0, 0.0)
 
         GL11.glEnable(GL11.GL_BLEND)
         GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        GL20.glColor4f(0f, 0f, 0f, 1f)
+        GL20.glColor4f(1f, 1f, 1f, 1f)
 
         blendsTex.forEach { (tex, blend) ->
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex)
@@ -34,6 +36,7 @@ class GLFWBlend(private val bounds: Rectangle) {
         GL11.glDisable(GL11.GL_BLEND)
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
         GL11.glPopMatrix()
+        GL30.glDisable(GL30.GL_TEXTURE_2D)
     }
 
     fun updateWindowConfigs(windowConfig: WindowConfig) {

@@ -98,7 +98,7 @@ public class ProjectionCanvas implements ProjectionManager {
         initializeList.forEach(Projectable::finish);
     }
 
-    protected void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(Graphics2D g, VirtualScreen vs) {
         PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
 
         if (fader != null) {

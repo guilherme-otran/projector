@@ -224,10 +224,10 @@ class GLFWColorCorrection(private val bounds: Rectangle) {
         val translateY = windowConfig.y / virtualScreen.height.toFloat()
 
         val uv = floatArrayOf(
-            translateX, translateY,
             translateX, translateY + texHeight,
-            translateX + texWidth, translateY + texHeight,
-            translateX + texWidth, translateY
+            translateX, translateY,
+            translateX + texWidth, translateY,
+            translateX + texWidth, translateY + texHeight
         )
 
         val uvBuffer = BufferUtils.createFloatBuffer(uv.size)
@@ -347,7 +347,6 @@ class GLFWColorCorrection(private val bounds: Rectangle) {
 
         GL20.glUniform1i(textureUniform, 0)
 
-        GL20.glActiveTexture(GL20.GL_TEXTURE0)
         GL20.glBindTexture(GL20.GL_TEXTURE_2D, texId)
 
         // Bind to the VAO that has all the information about the vertices

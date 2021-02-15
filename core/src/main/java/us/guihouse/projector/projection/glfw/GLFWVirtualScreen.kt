@@ -4,28 +4,30 @@ import org.lwjgl.BufferUtils
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
 import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL30
 import org.lwjgl.system.MemoryUtil
 import us.guihouse.projector.models.WindowConfig
 import us.guihouse.projector.other.EventQueue
 import us.guihouse.projector.other.RuntimeProperties
+import us.guihouse.projector.projection.ProjectionCanvas
 import us.guihouse.projector.projection.models.VirtualScreen
 import java.awt.Rectangle
-import java.awt.image.BufferedImage
 import java.lang.RuntimeException
 
-class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val windows: Map<String, GLFWWindow>, private val windowConfigs: Map<String, WindowConfig>) {
-    private val eventQueue = EventQueue(10)
+class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private val virtualScreen: VirtualScreen, private val windows: Map<String, GLFWWindow>, private val windowConfigs: Map<String, WindowConfig>) {
+    private val eventQueue = EventQueue(5)
 
     private var glWindow = 0L
-    private var glTexUploadWindow = 0L
-
-    private var texGLFWTexUpload: GLFWTexUpload? = null
 
     private var bounds: Rectangle? = null
 
     private var looper = Loop()
 
-    private var texture = 0
+    private var glTexture = 0
+    private var glFrameBuffer = 0
+    private var glDepthRenderBuffer = 0
+
+    private lateinit var graphics2D: GLFWGraphicsAdapter
 
     fun init() {
         bounds = Rectangle(virtualScreen.width, virtualScreen.height)
@@ -34,12 +36,6 @@ class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val wi
         glWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS", MemoryUtil.NULL, 0)
 
         if (glWindow == 0L) {
-            throw RuntimeException("Cannot create GLFW window")
-        }
-
-        glTexUploadWindow = GLFW.glfwCreateWindow(640, 480, "Projector Async Tex Upload", MemoryUtil.NULL, glWindow)
-
-        if (glTexUploadWindow == 0L) {
             throw RuntimeException("Cannot create GLFW window")
         }
 
@@ -53,10 +49,6 @@ class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val wi
         eventQueue.init()
     }
 
-    fun updateImage(src: BufferedImage) {
-        texGLFWTexUpload?.enqueue(src)
-    }
-
     internal inner class Starter : Runnable {
         override fun run() {
             windows.forEach { (id, window) ->
@@ -66,36 +58,42 @@ class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val wi
             GLFW.glfwMakeContextCurrent(glWindow)
             GL.createCapabilities()
 
-            texGLFWTexUpload = if (GLFWExtensions.isPboSupported()) {
-                GLFWAsyncTexUpload(bounds!!, glTexUploadWindow)
-            } else {
-                GLFWSyncTexUpload(bounds!!)
-            }
+            glTexture = GL11.glGenTextures()
 
-            texGLFWTexUpload!!.start()
-
-            texture = GL11.glGenTextures()
-
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture)
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, glTexture)
             GL11.glTexParameterf(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST.toFloat())
             GL11.glTexParameterf(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST.toFloat())
-
-            val buffer = BufferUtils.createByteBuffer(bounds!!.width * bounds!!.height * 3)
-            buffer.flip()
 
             GL11.glTexImage2D(
                 GL11.GL_TEXTURE_2D,
                 0,
-                GL11.GL_RGB,
+                GL11.GL_RGBA,
                 bounds!!.width,
                 bounds!!.height,
                 0,
-                GL11.GL_RGB,
+                GL11.GL_RGBA,
                 GL11.GL_UNSIGNED_BYTE,
-                buffer
+                0
             )
 
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+
+            glDepthRenderBuffer = GL30.glGenRenderbuffers()
+            GL30.glBindRenderbuffer(GL30.GL_RENDERBUFFER, glDepthRenderBuffer)
+            GL30.glRenderbufferStorage(GL30.GL_RENDERBUFFER, GL30.GL_DEPTH24_STENCIL8, bounds!!.width, bounds!!.height)
+            GL30.glBindRenderbuffer(GL30.GL_RENDERBUFFER, 0)
+
+            glFrameBuffer = GL30.glGenFramebuffers()
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, glFrameBuffer)
+            GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL30.GL_TEXTURE_2D, glTexture, 0)
+            GL30.glFramebufferRenderbuffer(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_STENCIL_ATTACHMENT, GL30.GL_RENDERBUFFER, glDepthRenderBuffer)
+
+            if (GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER) != GL30.GL_FRAMEBUFFER_COMPLETE) {
+                throw RuntimeException("Framebuffer incomplete")
+            }
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
+
+            graphics2D = GLFWGraphicsAdapter(bounds!!)
 
             eventQueue.enqueueContinuous(looper)
         }
@@ -118,9 +116,20 @@ class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val wi
             }
 
             GLFW.glfwMakeContextCurrent(glWindow)
-            texGLFWTexUpload!!.updateTex(texture)
 
-            windows.values.forEach { it.loopCycle(texture) }
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, glFrameBuffer)
+            GL30.glPushMatrix()
+            GL30.glViewport(0, 0, bounds!!.width, bounds!!.height)
+            GL30.glClearColor(0.1f, 0f, 0.1f, 1.0f)
+            GL30.glClear(GL30.GL_COLOR_BUFFER_BIT)
+
+            projectionCanvas.paintComponent(graphics2D, virtualScreen)
+
+            GL30.glPopMatrix()
+            GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
+
+            windows.values.forEach { it.loopCycle(glTexture) }
+
             GLFW.glfwPollEvents()
         }
     }
@@ -128,7 +137,9 @@ class GLFWVirtualScreen(private val virtualScreen: VirtualScreen, private val wi
     internal inner class Stopper : Runnable {
         override fun run() {
             eventQueue.removeContinuous(looper)
-            GL11.glDeleteTextures(texture)
+            GL11.glDeleteTextures(glTexture)
+            GL30.glDeleteRenderbuffers(glDepthRenderBuffer)
+            GL30.glDeleteFramebuffers(glFrameBuffer)
             windows.values.forEach { it.shutdown() }
             GLFW.glfwDestroyWindow(glWindow)
         }
