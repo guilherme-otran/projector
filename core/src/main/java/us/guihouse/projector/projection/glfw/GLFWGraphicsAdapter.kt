@@ -1,9 +1,9 @@
 package us.guihouse.projector.projection.glfw
 
+import us.guihouse.projector.other.EventQueue
 import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
 import java.awt.AlphaComposite
 import java.awt.Color
 import java.awt.Composite
@@ -26,20 +26,19 @@ import java.awt.image.BufferedImageOp
 import java.awt.image.ImageObserver
 import java.awt.image.RenderedImage
 import java.awt.image.renderable.RenderableImage
-import java.nio.ByteBuffer
 import java.text.AttributedCharacterIterator
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.system.measureTimeMillis
 
-class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
+class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: GLFWGraphicsAdapterProvider) : Graphics2D() {
+
     private var transform: AffineTransform = AffineTransform()
     private var color: Color = Color(0, 0, 0)
     private var composite: Composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f)
     private var font: Font = Font(Font.SANS_SERIF, 0, 16)
 
     override fun create(): Graphics {
-        return GLFWGraphicsAdapter(bounds)
+        return GLFWGraphicsAdapter(bounds, provider)
     }
 
     override fun translate(x: Int, y: Int) {
@@ -58,21 +57,21 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
         this.color = c ?: Color(0, 0, 0)
     }
 
-    private fun updateColor() {
+    private fun updateColor(color: Color, composite: Composite) {
         var alpha = color.alpha / 255.0f
 
         if (composite is AlphaComposite) {
-            alpha *= (composite as AlphaComposite).alpha
+            alpha *= composite.alpha
         }
 
         GL11.glColor4f(color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, alpha)
     }
 
-    private fun updateAlpha() {
+    private fun updateAlpha(composite: Composite) {
         var alpha = 1.0f
 
         if (composite is AlphaComposite) {
-            alpha *= (composite as AlphaComposite).alpha
+            alpha *= composite.alpha
         }
 
         GL11.glColor4f(1f, 1f, 1f, alpha)
@@ -80,6 +79,11 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
 
     private fun adjustOrtho() {
         GL11.glOrtho(bounds.x.toDouble(), bounds.width.toDouble(), bounds.height.toDouble(), bounds.y.toDouble(), 1.0, 0.0)
+    }
+
+    private fun updateTransform(transform: AffineTransform) {
+        GL11.glScaled(transform.scaleX, transform.scaleY, 1.0)
+        GL11.glTranslated(transform.translateX, transform.translateY, 0.0)
     }
 
     override fun setPaintMode() {
@@ -131,22 +135,29 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
     }
 
     override fun fillRect(x: Int, y: Int, width: Int, height: Int) {
-        GL11.glPushMatrix()
-        adjustOrtho()
-        GL11.glEnable(GL11.GL_COLOR_MATERIAL)
-        GL11.glEnable(GL11.GL_BLEND)
-        updateColor()
+        val currentColor = getColor()
+        val currentComposite = getComposite()
+        val currentTransform = getTransform()
 
-        GL11.glBegin(GL11.GL_QUADS)
-        GL11.glVertex2i(x, y)
-        GL11.glVertex2i(x, y + height)
-        GL11.glVertex2i(x + width, y + height)
-        GL11.glVertex2i(x + width, y)
-        GL11.glEnd()
+        provider.enqueueForDraw {
+            GL11.glPushMatrix()
+            adjustOrtho()
+            updateTransform(currentTransform)
+            GL11.glEnable(GL11.GL_COLOR_MATERIAL)
+            GL11.glEnable(GL11.GL_BLEND)
+            updateColor(currentColor, currentComposite)
 
-        GL11.glDisable(GL11.GL_COLOR_MATERIAL)
-        GL11.glDisable(GL11.GL_BLEND)
-        GL11.glPopMatrix()
+            GL11.glBegin(GL11.GL_QUADS)
+            GL11.glVertex2i(x, y)
+            GL11.glVertex2i(x, y + height)
+            GL11.glVertex2i(x + width, y + height)
+            GL11.glVertex2i(x + width, y)
+            GL11.glEnd()
+
+            GL11.glDisable(GL11.GL_COLOR_MATERIAL)
+            GL11.glDisable(GL11.GL_BLEND)
+            GL11.glPopMatrix()
+        }
     }
 
     override fun clearRect(x: Int, y: Int, width: Int, height: Int) {
@@ -310,33 +321,11 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
             }
         }
 
-        bgcolor?.let {
-            val oldColor = getColor()
-            setColor(it)
-
-            val x = min(dx1, dx2)
-            val y = min(dy1, dy2)
-            val width = max(dx1, dx2) - x
-            val height = max(dy1, dy2) - y
-
-            fillRect(x, y, width, height)
-
-            setColor(oldColor)
-        }
-
         val width = tempImg.width
         val height = tempImg.height
 
         val buffer = BufferUtils.createByteBuffer(width * height * 4)
         RGBImageCopy.copyImageToBuffer(tempImg,  buffer, true)
-
-        GL11.glEnable(GL11.GL_BLEND)
-        GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        GL11.glEnable(GL11.GL_TEXTURE_2D)
-
-        GL11.glPushMatrix()
-        adjustOrtho()
-        updateAlpha()
 
         val texId = GL11.glGenTextures()
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
@@ -345,28 +334,59 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle) : Graphics2D() {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
 
         GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer)
-
-        GL11.glBegin(GL11.GL_QUADS)
-
-        GL11.glTexCoord2d(sx1 / width.toDouble(), sy1 / height.toDouble())
-        GL11.glVertex2i(dx1, dy1)
-
-        GL11.glTexCoord2d(sx1 / width.toDouble(), sy2 / height.toDouble())
-        GL11.glVertex2i(dx1, dy2)
-
-        GL11.glTexCoord2d(sx2 / width.toDouble(), sy2 / height.toDouble())
-        GL11.glVertex2i(dx2, dy2)
-
-        GL11.glTexCoord2d(sx2 / width.toDouble(), sy1 / height.toDouble())
-        GL11.glVertex2i(dx2, dy1)
-
-        GL11.glEnd()
-
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-        GL11.glPopMatrix()
-        GL11.glDeleteTextures(texId)
-        GL11.glDisable(GL11.GL_BLEND)
-        GL11.glDisable(GL11.GL_TEXTURE_2D)
+
+        val currentComposite = composite
+        val currentTransform = transform
+
+        bgcolor?.let {
+            val oldColor = getColor()
+            setColor(it)
+
+            val x = min(dx1, dx2)
+            val y = min(dy1, dy2)
+            val bgWidth = max(dx1, dx2) - x
+            val bgHeight = max(dy1, dy2) - y
+
+            fillRect(x, y, bgWidth, bgHeight)
+
+            setColor(oldColor)
+        }
+
+        provider.enqueueForDraw {
+            GL11.glEnable(GL11.GL_BLEND)
+            GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+
+            GL11.glPushMatrix()
+            adjustOrtho()
+            updateTransform(currentTransform)
+            updateAlpha(currentComposite)
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
+
+            GL11.glBegin(GL11.GL_QUADS)
+
+            GL11.glTexCoord2d(sx1 / width.toDouble(), sy1 / height.toDouble())
+            GL11.glVertex2i(dx1, dy1)
+
+            GL11.glTexCoord2d(sx1 / width.toDouble(), sy2 / height.toDouble())
+            GL11.glVertex2i(dx1, dy2)
+
+            GL11.glTexCoord2d(sx2 / width.toDouble(), sy2 / height.toDouble())
+            GL11.glVertex2i(dx2, dy2)
+
+            GL11.glTexCoord2d(sx2 / width.toDouble(), sy1 / height.toDouble())
+            GL11.glVertex2i(dx2, dy1)
+
+            GL11.glEnd()
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            GL11.glPopMatrix()
+            GL11.glDeleteTextures(texId)
+            GL11.glDisable(GL11.GL_BLEND)
+            GL11.glDisable(GL11.GL_TEXTURE_2D)
+        }
 
         return true
     }

@@ -18,6 +18,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
     private val eventQueue = EventQueue(5)
 
     private var glWindow = 0L
+    private var glDrawerWindow = 0L
 
     private var bounds: Rectangle? = null
 
@@ -27,7 +28,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
     private var glFrameBuffer = 0
     private var glDepthRenderBuffer = 0
 
-    private lateinit var graphics2D: GLFWGraphicsAdapter
+    private lateinit var drawer: GLFWGraphicsAdapterDrawer
 
     fun init() {
         bounds = Rectangle(virtualScreen.width, virtualScreen.height)
@@ -39,6 +40,14 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
             throw RuntimeException("Cannot create GLFW window")
         }
 
+        glDrawerWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS Draw", MemoryUtil.NULL, glWindow)
+
+        if (glDrawerWindow == 0L) {
+            throw RuntimeException("Cannot create GLFW drawer window")
+        }
+
+        drawer = GLFWGraphicsAdapterDrawer(glDrawerWindow, projectionCanvas, bounds!!, virtualScreen)
+
         windows.values.forEach {
             it.createWindow(glWindow)
         }
@@ -46,6 +55,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
         eventQueue.setStartRunnable(Starter())
         eventQueue.setStopRunnable(Stopper())
 
+        drawer.init()
         eventQueue.init()
     }
 
@@ -93,8 +103,6 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
             }
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
 
-            graphics2D = GLFWGraphicsAdapter(bounds!!)
-
             eventQueue.enqueueContinuous(looper)
         }
 
@@ -123,7 +131,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
             GL30.glClearColor(0.1f, 0f, 0.1f, 1.0f)
             GL30.glClear(GL30.GL_COLOR_BUFFER_BIT)
 
-            projectionCanvas.paintComponent(graphics2D, virtualScreen)
+            drawer.drawNextFrame()
 
             GL30.glPopMatrix()
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
