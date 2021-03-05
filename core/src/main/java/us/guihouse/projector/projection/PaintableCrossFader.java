@@ -22,6 +22,7 @@ public class PaintableCrossFader {
     private Paintable previous;
     private float currentFadeAlpha;
     private FadeDirection direction = null;
+    private Runnable callback = null;
 
     @Getter
     @Setter
@@ -34,7 +35,12 @@ public class PaintableCrossFader {
         direction = FadeDirection.IN;
     }
 
-    public void crossFadeIn(Paintable next) {
+    public void crossFadeIn(Paintable next, Runnable callback) {
+        if (this.callback != null) {
+            this.callback.run();
+        }
+
+        this.callback = callback;
         previous = current;
         currentFadeAlpha = 0f;
         current = next;
@@ -49,6 +55,11 @@ public class PaintableCrossFader {
                 direction = null;
                 currentFadeAlpha = 1.0f;
                 previous = null;
+
+                if (callback != null) {
+                    callback.run();
+                    callback = null;
+                }
             }
         } else if (direction == FadeDirection.OUT){
             currentFadeAlpha -= stepPerFrame;
@@ -57,6 +68,11 @@ public class PaintableCrossFader {
                 direction = null;
                 currentFadeAlpha = 0f;
                 current = null;
+
+                if (callback != null) {
+                    callback.run();
+                    callback = null;
+                }
             }
         }
 

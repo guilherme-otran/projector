@@ -1,9 +1,8 @@
 package us.guihouse.projector.projection.glfw
 
-import us.guihouse.projector.other.EventQueue
-import org.lwjgl.BufferUtils
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL20
+import org.lwjgl.opengl.GL30
 import java.awt.AlphaComposite
 import java.awt.Color
 import java.awt.Composite
@@ -37,8 +36,24 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
     private var composite: Composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f)
     private var font: Font = Font(Font.SANS_SERIF, 0, 16)
 
+    private val imagesAndBuffers = HashMap<BufferedImage, Int>()
+    private val filledStaticBuffers = ArrayList<Int>()
+
     override fun create(): Graphics {
         return GLFWGraphicsAdapter(bounds, provider)
+    }
+
+    fun setImageAsStatic(img: BufferedImage) {
+        if (imagesAndBuffers[img] == null) {
+            imagesAndBuffers[img] = provider.dequeueMultiFrameGlBuffer()
+        }
+    }
+
+    fun clearStaticImage(img: BufferedImage) {
+        imagesAndBuffers.remove(img)?.let {
+            filledStaticBuffers.remove(it)
+            provider.freeMultiFrameGlBuffer(it)
+        }
     }
 
     override fun translate(x: Int, y: Int) {
@@ -324,17 +339,30 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
         val width = tempImg.width
         val height = tempImg.height
 
-        val buffer = BufferUtils.createByteBuffer(width * height * 4)
-        RGBImageCopy.copyImageToBuffer(tempImg,  buffer, true)
+        val staticGlBuffer = imagesAndBuffers[tempImg]
+        val glBuffer = staticGlBuffer ?: provider.dequeueGlBuffer()
 
-        val texId = GL11.glGenTextures()
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
+        val shouldFillBuffer = staticGlBuffer?.let { !filledStaticBuffers.contains(it) } ?: true
 
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
+        if (shouldFillBuffer) {
+            staticGlBuffer?.let { filledStaticBuffers.add(it) }
 
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer)
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, glBuffer)
+            GL30.glBufferData(
+                    GL30.GL_PIXEL_UNPACK_BUFFER,
+                    width * height * 4L,
+                    GL30.GL_STREAM_DRAW
+            )
+
+            val destination = GL30.glMapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, GL30.GL_WRITE_ONLY)
+
+            if (destination != null) {
+                RGBImageCopy.copyImageToBuffer(tempImg, destination, true)
+            }
+
+            GL30.glUnmapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER)
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0)
+        }
 
         val currentComposite = composite
         val currentTransform = transform
@@ -363,7 +391,14 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
             updateTransform(currentTransform)
             updateAlpha(currentComposite)
 
+            val texId = GL11.glGenTextures()
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
+
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
+
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, glBuffer)
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L)
 
             GL11.glBegin(GL11.GL_QUADS)
 
@@ -382,8 +417,8 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
             GL11.glEnd()
 
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0)
             GL11.glPopMatrix()
-            GL11.glDeleteTextures(texId)
             GL11.glDisable(GL11.GL_BLEND)
             GL11.glDisable(GL11.GL_TEXTURE_2D)
         }
@@ -392,7 +427,6 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
     }
 
     override fun dispose() {
-
     }
 
     override fun draw(s: Shape?) {

@@ -120,10 +120,9 @@ public class PreviewImageView extends ImageView implements Runnable {
                 projectionCanvas.paintComponent(targetGraphics, main);
                 targetGraphics.setTransform(old);
 
-                SwingFXUtils.toFXImage(targetRender, fxTargetRender);
-
                 Platform.runLater(() -> {
-                    setImage(fxTargetRender);
+                    //SwingFXUtils.toFXImage(targetRender, fxTargetRender);
+                    //setImage(fxTargetRender);
                     repainting = false;
                 });
             }

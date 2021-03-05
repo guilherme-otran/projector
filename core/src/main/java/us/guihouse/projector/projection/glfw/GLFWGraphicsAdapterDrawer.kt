@@ -10,6 +10,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
+import org.lwjgl.opengl.GL30
+import java.util.concurrent.ConcurrentLinkedQueue
 
 
 class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
@@ -21,47 +23,76 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
         const val BUFFER_LIMIT = 3
     }
 
-    private var currentFrame: Queue<Runnable>? = null
+    internal data class Frame(val draws: Queue<Runnable>, val glBuffers: Queue<Int>)
 
-    private val filledBuffer: LinkedBlockingQueue<Queue<Runnable>> = LinkedBlockingQueue()
-    private val freeBuffer: LinkedBlockingQueue<Queue<Runnable>> = LinkedBlockingQueue()
+    private var currentFrame: Frame? = null
+
+    private val filledFrameBuffer: LinkedBlockingQueue<Frame> = LinkedBlockingQueue()
+    private val freeFrameBuffer: LinkedBlockingQueue<Frame> = LinkedBlockingQueue()
+
+    private val freeGlBuffers = ConcurrentLinkedQueue<Int>()
+    private val allocatedGlBuffers = ArrayList<Int>()
+
+    private val freeMultiFrameGlBuffers = ConcurrentLinkedQueue<Int>()
 
     private val graphicsAdapter = GLFWGraphicsAdapter(bounds, this)
 
     private val loopRun: Runnable = Runnable {
         run() {
-            currentFrame = freeBuffer.poll(500, TimeUnit.MILLISECONDS)
+            currentFrame = freeFrameBuffer.poll(500, TimeUnit.MILLISECONDS)
 
             currentFrame?.let {
-                it.clear()
+                it.draws.clear()
                 projectionCanvas.paintComponent(graphicsAdapter, virtualScreen)
-                filledBuffer.add(it)
+                filledFrameBuffer.add(it)
             }
         }
     }
 
     override fun enqueueForDraw(runnable: Runnable) {
-        currentFrame!!.add(runnable)
+        currentFrame!!.draws.add(runnable)
+    }
+
+    private fun allocateGlBuffer(): Int {
+        val buffer = GL30.glGenBuffers()
+        allocatedGlBuffers.add(buffer)
+        return buffer
+    }
+
+    override fun dequeueGlBuffer(): Int {
+        val glBuffer = freeGlBuffers.poll() ?: allocateGlBuffer()
+        currentFrame!!.glBuffers.add(glBuffer)
+        return glBuffer
+    }
+
+    override fun dequeueMultiFrameGlBuffer(): Int {
+        return freeMultiFrameGlBuffers.poll() ?: allocateGlBuffer()
+    }
+
+    override fun freeMultiFrameGlBuffer(glBuffer: Int) {
+        freeMultiFrameGlBuffers.add(glBuffer)
     }
 
     fun drawNextFrame() {
-        val frame = filledBuffer.poll(500, TimeUnit.MILLISECONDS)
+        val frame = filledFrameBuffer.poll(500, TimeUnit.MILLISECONDS)
 
         frame?.let {
-            var part = it.poll()
+            var part = it.draws.poll()
 
             while (part != null) {
                 part.run()
-                part = it.poll()
+                part = it.draws.poll()
             }
 
-            freeBuffer.add(it)
+            freeGlBuffers.addAll(it.glBuffers)
+            it.glBuffers.clear()
+            freeFrameBuffer.add(it)
         }
     }
 
     override fun init() {
         for (i in 1..BUFFER_LIMIT) {
-            freeBuffer.add(LinkedList())
+            freeFrameBuffer.add(Frame(LinkedList(), LinkedList()))
         }
 
         super.enqueueContinuous(loopRun)
@@ -77,6 +108,8 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
     override fun onStop() {
         super.onStop()
         super.removeContinuous(loopRun)
+        allocatedGlBuffers.forEach(GL30::glDeleteBuffers)
+        allocatedGlBuffers.clear()
         GLFW.glfwDestroyWindow(glWindow)
     }
 }

@@ -16,14 +16,13 @@ import java.awt.Toolkit;
 import java.awt.font.GlyphVector;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javafx.application.Platform;
 import lombok.Getter;
 import us.guihouse.projector.other.ProjectorPreferences;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.StringWithPosition;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.projection.text.WrappedText;
@@ -168,13 +167,37 @@ public class ProjectionLabel implements Projectable {
             PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
 
             if (fader != null) {
-                fader.crossFadeIn(new ImagePaintable(newImage));
+                fader.crossFadeIn(new ImagePaintable(newImage), () -> {
+                    removeStaticImage.add(newImage);
+                });
+
+                addStaticImages.add(newImage);
             }
         });
     }
 
+    private final Queue<BufferedImage> addStaticImages = new ConcurrentLinkedQueue<>();
+    private final Queue<BufferedImage> removeStaticImage = new ConcurrentLinkedQueue<>();
+
     @Override
     public void paintComponent(Graphics2D g, VirtualScreen vs) {
+        if (g instanceof GLFWGraphicsAdapter) {
+            GLFWGraphicsAdapter gg = ((GLFWGraphicsAdapter) g);
+            BufferedImage img = removeStaticImage.poll();
+
+            while (img != null) {
+                gg.clearStaticImage(img);
+                img = removeStaticImage.poll();
+            }
+
+            img = addStaticImages.poll();
+
+            while (img != null) {
+                gg.setImageAsStatic(img);
+                img = addStaticImages.poll();
+            }
+        }
+
         PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
 
         if (fader != null) {

@@ -145,6 +145,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
     internal inner class Stopper : Runnable {
         override fun run() {
             eventQueue.removeContinuous(looper)
+            drawer.stop()
             GL11.glDeleteTextures(glTexture)
             GL30.glDeleteRenderbuffers(glDepthRenderBuffer)
             GL30.glDeleteFramebuffers(glFrameBuffer)
