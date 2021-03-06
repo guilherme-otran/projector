@@ -10,6 +10,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
+import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -36,6 +37,8 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
     private val freeMultiFrameGlBuffers = ConcurrentLinkedQueue<Int>()
 
     private val graphicsAdapter = GLFWGraphicsAdapter(bounds, this)
+
+    private val allocatedTex = ArrayList<Int>()
 
     private val loopRun: Runnable = Runnable {
         run() {
@@ -71,6 +74,17 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
 
     override fun freeMultiFrameGlBuffer(glBuffer: Int) {
         freeMultiFrameGlBuffers.add(glBuffer)
+    }
+
+    override fun dequeueTex(): Int {
+        val tex = GL11.glGenTextures()
+        allocatedTex.add(tex)
+        return tex
+    }
+
+    override fun freeTex(videoTex: Int) {
+        GL11.glDeleteTextures(videoTex)
+        allocatedTex.remove(videoTex)
     }
 
     fun drawNextFrame() {
@@ -110,6 +124,8 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
         super.removeContinuous(loopRun)
         allocatedGlBuffers.forEach(GL30::glDeleteBuffers)
         allocatedGlBuffers.clear()
+        allocatedTex.forEach(GL11::glDeleteTextures)
+        allocatedTex.clear()
         GLFW.glfwDestroyWindow(glWindow)
     }
 }

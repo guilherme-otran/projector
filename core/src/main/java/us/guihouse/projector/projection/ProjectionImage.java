@@ -5,6 +5,7 @@
  */
 package us.guihouse.projector.projection;
 
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.BackgroundProvide;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
@@ -42,7 +43,7 @@ public class ProjectionImage implements Projectable {
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         if (isEmpty()) {
             return;
         }

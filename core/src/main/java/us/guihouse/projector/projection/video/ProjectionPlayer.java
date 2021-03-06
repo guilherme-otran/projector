@@ -99,14 +99,17 @@ public class ProjectionPlayer extends ProjectionVideo {
                     e.printStackTrace();
                 }
 
-                BufferedImage src = ProjectionPlayer.this.getImage();
+                int[] src = ProjectionPlayer.this.getImageData();
                 WritableImage dst = fxImage;
 
                 if (dst == null || src == null) {
                     continue;
                 }
 
-                SwingFXUtils.toFXImage(src, dst);
+                long w = Math.round(Math.floor(dst.getWidth()));
+                long h = Math.round(Math.floor(dst.getHeight()));
+
+                // TODO
             }
         }
     }

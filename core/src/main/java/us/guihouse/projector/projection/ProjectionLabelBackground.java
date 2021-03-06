@@ -24,6 +24,7 @@ import java.util.List;
 import javafx.application.Platform;
 import lombok.Getter;
 import us.guihouse.projector.other.ProjectorPreferences;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.StringWithPosition;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.projection.text.WrappedText;
@@ -76,7 +77,7 @@ public class ProjectionLabelBackground implements Projectable {
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
 
         if (fader != null) {
@@ -116,7 +117,7 @@ public class ProjectionLabelBackground implements Projectable {
 
     static class BackgroundPaintable implements Paintable {
         @Override
-        public void paintComponent(Graphics2D g, VirtualScreen vs) {
+        public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
             g.setColor(OVERLAY);
             g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
         }

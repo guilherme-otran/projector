@@ -5,24 +5,24 @@
  */
 package us.guihouse.projector.projection;
 
-import java.awt.BasicStroke;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.Shape;
-import java.awt.Toolkit;
+import java.awt.*;
 import java.awt.font.GlyphVector;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javafx.application.Platform;
 import lombok.Getter;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 import us.guihouse.projector.other.ProjectorPreferences;
 import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
+import us.guihouse.projector.projection.glfw.RGBImageCopy;
 import us.guihouse.projector.projection.models.StringWithPosition;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.projection.text.WrappedText;
@@ -163,42 +163,37 @@ public class ProjectionLabel implements Projectable {
             }
 
             g.dispose();
-
-            PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
-
-            if (fader != null) {
-                fader.crossFadeIn(new ImagePaintable(newImage), () -> {
-                    removeStaticImage.add(newImage);
-                });
-
-                addStaticImages.add(newImage);
-            }
+            virtualScreenImages.put(vs, newImage);
         });
     }
 
-    private final Queue<BufferedImage> addStaticImages = new ConcurrentLinkedQueue<>();
-    private final Queue<BufferedImage> removeStaticImage = new ConcurrentLinkedQueue<>();
+    private final HashMap<VirtualScreen, BufferedImage> virtualScreenImages = new HashMap<>();
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
-        if (g instanceof GLFWGraphicsAdapter) {
-            GLFWGraphicsAdapter gg = ((GLFWGraphicsAdapter) g);
-            BufferedImage img = removeStaticImage.poll();
-
-            while (img != null) {
-                gg.clearStaticImage(img);
-                img = removeStaticImage.poll();
-            }
-
-            img = addStaticImages.poll();
-
-            while (img != null) {
-                gg.setImageAsStatic(img);
-                img = addStaticImages.poll();
-            }
-        }
-
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+        BufferedImage img = virtualScreenImages.remove(vs);
         PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
+
+        if (img != null && fader != null) {
+            int tex = g.getProvider().dequeueTex();
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+            ByteBuffer buffer = BufferUtils.createByteBuffer(img.getWidth() * img.getHeight() * 4);
+            RGBImageCopy.copyImageToBuffer(img, buffer, true);
+
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, img.getWidth(), img.getHeight(), 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+
+            fader.crossFadeIn(new TexPaintable(tex), () ->
+                    g.getProvider().enqueueForDraw(() ->
+                        g.getProvider().freeTex(tex)
+                    )
+            );
+        }
 
         if (fader != null) {
             fader.paintComponent(g);
@@ -336,16 +331,49 @@ public class ProjectionLabel implements Projectable {
         return this.fontMetrics;
     }
 
-    static class ImagePaintable implements Paintable {
-        private final BufferedImage image;
+    static class TexPaintable implements Paintable {
+        private final int tex;
 
-        ImagePaintable(BufferedImage image) {
-            this.image = image;
+        TexPaintable(int tex) {
+            this.tex = tex;
         }
 
         @Override
-        public void paintComponent(Graphics2D g, VirtualScreen vs) {
-            g.drawImage(image, 0, 0, null);
+        public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+            Composite composite = g.getComposite();
+
+            g.getProvider().enqueueForDraw(() -> {
+                GL11.glEnable(GL11.GL_TEXTURE_2D);
+                GL11.glEnable(GL11.GL_BLEND);
+                GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+                GL11.glPushMatrix();
+                g.adjustOrtho();
+                g.updateAlpha(composite);
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+
+                GL11.glBegin(GL11.GL_QUADS);
+
+                GL11.glTexCoord2d(0, 0);
+                GL11.glVertex2i(0, 0);
+
+                GL11.glTexCoord2d(0, 1);
+                GL11.glVertex2i(0, vs.getHeight());
+
+                GL11.glTexCoord2d(1, 1);
+                GL11.glVertex2i(vs.getWidth(), vs.getHeight());
+
+                GL11.glTexCoord2d(1, 0);
+                GL11.glVertex2i(vs.getWidth(), 0);
+
+                GL11.glEnd();
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                GL11.glPopMatrix();
+                GL11.glDisable(GL11.GL_BLEND);
+                GL11.glDisable(GL11.GL_TEXTURE_2D);
+            });
         }
     }
 }

@@ -9,6 +9,7 @@ import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import us.guihouse.projector.projection.CanvasDelegate;
 import us.guihouse.projector.projection.PaintableCrossFader;
 import us.guihouse.projector.projection.Projectable;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.utils.ThemeFinder;
 
@@ -38,7 +39,7 @@ public class ProjectionBackgroundVideo implements Projectable, ProjectionBackgro
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         videoProjector.paintComponent(g, vs);
     }
 

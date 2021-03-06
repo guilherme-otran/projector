@@ -15,6 +15,7 @@ import java.util.List;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyProperty;
 import us.guihouse.projector.other.ProjectorPreferences;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.BackgroundModel;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.projection.text.WrappedText;
@@ -98,7 +99,7 @@ public class ProjectionCanvas implements ProjectionManager {
         initializeList.forEach(Projectable::finish);
     }
 
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         PaintableCrossFader fader = faders.get(vs.getVirtualScreenId());
 
         if (fader != null) {

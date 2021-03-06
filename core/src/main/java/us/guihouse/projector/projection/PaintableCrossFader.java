@@ -2,6 +2,7 @@ package us.guihouse.projector.projection;
 
 import lombok.Getter;
 import lombok.Setter;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.projection.video.ProjectionBackgroundVideo;
 
@@ -22,6 +23,7 @@ public class PaintableCrossFader {
     private Paintable previous;
     private float currentFadeAlpha;
     private FadeDirection direction = null;
+    private Runnable previousCallback = null;
     private Runnable callback = null;
 
     @Getter
@@ -36,10 +38,11 @@ public class PaintableCrossFader {
     }
 
     public void crossFadeIn(Paintable next, Runnable callback) {
-        if (this.callback != null) {
-            this.callback.run();
+        if (this.previousCallback != null) {
+            this.previousCallback.run();
         }
 
+        previousCallback = this.callback;
         this.callback = callback;
         previous = current;
         currentFadeAlpha = 0f;
@@ -47,7 +50,7 @@ public class PaintableCrossFader {
         direction = FadeDirection.IN_OUT;
     }
 
-    public void paintComponent(Graphics2D g) {
+    public void paintComponent(GLFWGraphicsAdapter g) {
         if (direction == FadeDirection.IN || direction == FadeDirection.IN_OUT) {
             currentFadeAlpha += stepPerFrame;
 
@@ -56,9 +59,9 @@ public class PaintableCrossFader {
                 currentFadeAlpha = 1.0f;
                 previous = null;
 
-                if (callback != null) {
-                    callback.run();
-                    callback = null;
+                if (previousCallback != null) {
+                    previousCallback.run();
+                    previousCallback = null;
                 }
             }
         } else if (direction == FadeDirection.OUT){

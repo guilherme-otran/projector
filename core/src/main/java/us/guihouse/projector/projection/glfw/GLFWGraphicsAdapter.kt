@@ -29,7 +29,7 @@ import java.text.AttributedCharacterIterator
 import kotlin.math.max
 import kotlin.math.min
 
-class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: GLFWGraphicsAdapterProvider) : Graphics2D() {
+class GLFWGraphicsAdapter(private val bounds: Rectangle, val provider: GLFWGraphicsAdapterProvider) : Graphics2D() {
 
     private var transform: AffineTransform = AffineTransform()
     private var color: Color = Color(0, 0, 0)
@@ -82,7 +82,7 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
         GL11.glColor4f(color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, alpha)
     }
 
-    private fun updateAlpha(composite: Composite) {
+    fun updateAlpha(composite: Composite) {
         var alpha = 1.0f
 
         if (composite is AlphaComposite) {
@@ -92,11 +92,11 @@ class GLFWGraphicsAdapter(private val bounds: Rectangle, private val provider: G
         GL11.glColor4f(1f, 1f, 1f, alpha)
     }
 
-    private fun adjustOrtho() {
+    fun adjustOrtho() {
         GL11.glOrtho(bounds.x.toDouble(), bounds.width.toDouble(), bounds.height.toDouble(), bounds.y.toDouble(), 1.0, 0.0)
     }
 
-    private fun updateTransform(transform: AffineTransform) {
+    fun updateTransform(transform: AffineTransform) {
         GL11.glScaled(transform.scaleX, transform.scaleY, 1.0)
         GL11.glTranslated(transform.translateX, transform.translateY, 0.0)
     }

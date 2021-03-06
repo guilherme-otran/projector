@@ -3,6 +3,9 @@ package us.guihouse.projector.projection.video;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import uk.co.caprica.vlcj.player.embedded.videosurface.CallbackVideoSurface;
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat;
@@ -11,6 +14,8 @@ import uk.co.caprica.vlcj.player.embedded.videosurface.callback.RenderCallback;
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.format.RV32BufferFormat;
 import us.guihouse.projector.projection.CanvasDelegate;
 import us.guihouse.projector.projection.Projectable;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
+import us.guihouse.projector.projection.glfw.RGBImageCopy;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.utils.VlcPlayerFactory;
 
@@ -25,8 +30,13 @@ public class ProjectionVideo implements Projectable {
 
     protected MediaPlayer player;
 
-    protected BufferedImage image;
-    protected BufferedImage freeze = null;
+    private int[] imageData;
+    private int[] freezeImageData;
+
+    private int videoTex = 0;
+    private int texW;
+    private int texH;
+
     protected boolean firstFrame = false;
 
     protected int videoW = 0;
@@ -105,37 +115,117 @@ public class ProjectionVideo implements Projectable {
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+        if (imageData == null && freezeImageData == null) {
+            return;
+        }
+
         int rWidth = width.getOrDefault(vs.getVirtualScreenId(), 0);
         int rHeight = height.getOrDefault(vs.getVirtualScreenId(), 0);
-        int rProjectionX = projectionX.getOrDefault(vs.getVirtualScreenId(), 0);
-        int rProjectionY = projectionY.getOrDefault(vs.getVirtualScreenId(), 0);
 
         if (render.get() && rWidth > 0 && rHeight > 0) {
+            int videoW = this.videoW;
+            int videoH = this.videoH;
+            int[] data = freezeImageData != null ? freezeImageData : imageData;
+
+            if (videoW * videoH != data.length) {
+                return;
+            }
+
+            int buffer = g.getProvider().dequeueGlBuffer();
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
+
+            GL30.glBufferData(
+                    GL30.GL_PIXEL_UNPACK_BUFFER,
+                    (long) data.length * 4,
+                    GL30.GL_STREAM_DRAW
+            );
+
+            ByteBuffer destination = GL30.glMapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, GL30.GL_WRITE_ONLY);
+
+            if (destination != null) {
+                RGBImageCopy.copyImageToBuffer(data, destination, true);
+            }
+
+            GL30.glUnmapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER);
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+
+            int rProjectionX = projectionX.getOrDefault(vs.getVirtualScreenId(), 0);
+            int rProjectionY = projectionY.getOrDefault(vs.getVirtualScreenId(), 0);
+
             g.setColor(Color.BLACK);
             g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
-            if (freeze == null) {
-                g.drawImage(image, rProjectionX, rProjectionY, rWidth, rHeight, null);
-            } else {
-                g.drawImage(freeze, rProjectionX, rProjectionY, rWidth, rHeight, null);
-            }
+
+            Composite composite = g.getComposite();
+
+            g.getProvider().enqueueForDraw(() -> {
+                GL11.glEnable(GL11.GL_BLEND);
+                GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+                GL11.glEnable(GL11.GL_TEXTURE_2D);
+
+                if (videoTex == 0) {
+                    videoTex = g.getProvider().dequeueTex();
+
+                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, videoTex);
+
+                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                }
+
+                GL11.glPushMatrix();
+                g.adjustOrtho();
+                g.updateAlpha(composite);
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, videoTex);
+
+                GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
+
+                if (videoW != texW || videoH != texH) {
+                    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, videoW, videoH, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
+                    texW = videoW;
+                    texH = videoH;
+                } else {
+                    GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, videoW, videoH, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
+                }
+
+                GL11.glBegin(GL11.GL_QUADS);
+
+                GL11.glTexCoord2d(0, 0);
+                GL11.glVertex2i(rProjectionX, rProjectionY);
+
+                GL11.glTexCoord2d(0, 1);
+                GL11.glVertex2i(rProjectionX, rProjectionY + rHeight);
+
+                GL11.glTexCoord2d(1, 1);
+                GL11.glVertex2i(rProjectionX + rWidth, rProjectionY + rHeight);
+
+                GL11.glTexCoord2d(1, 0);
+                GL11.glVertex2i(rProjectionX + rWidth, rProjectionY);
+
+                GL11.glEnd();
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+                GL11.glPopMatrix();
+                GL11.glDisable(GL11.GL_BLEND);
+                GL11.glDisable(GL11.GL_TEXTURE_2D);
+            });
         }
     }
 
-    public BufferedImage getImage() {
-        return image;
+    public int[] getImageData() {
+        return imageData;
     }
 
     public void freeze() {
-        if (freeze == null && image != null) {
-            firstFrame = true;
-            freeze = delegate.getDefaultDevice().getDefaultConfiguration().createCompatibleImage(videoW, videoH);
-            image.copyData(freeze.getRaster());
-        }
+        freezeImageData = imageData;
+        firstFrame = true;
     }
 
     public void unfreeze() {
-        freeze = null;
+        freezeImageData = null;
         rebuildLayout();
     }
 
@@ -144,7 +234,7 @@ public class ProjectionVideo implements Projectable {
         videoW = w;
         videoH = h;
 
-        image = delegate.getDefaultDevice().getDefaultConfiguration().createCompatibleImage(w, h);
+        imageData = new int[w * h];
     }
 
     @Override
@@ -165,7 +255,7 @@ public class ProjectionVideo implements Projectable {
             if (firstFrame) {
                 firstFrame = false;
             } else {
-                nativeBuffers[0].asIntBuffer().get(((DataBufferInt) image.getRaster().getDataBuffer()).getData());
+                nativeBuffers[0].asIntBuffer().get(imageData);
                 unfreeze();
             }
         }

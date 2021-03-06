@@ -16,6 +16,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
 import javafx.scene.web.WebView;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
 import javax.swing.*;
@@ -39,7 +40,7 @@ public class ProjectionWebView implements Projectable {
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
 

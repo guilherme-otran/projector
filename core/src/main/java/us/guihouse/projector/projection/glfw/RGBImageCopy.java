@@ -49,6 +49,16 @@ public class RGBImageCopy {
         buffer.flip();
     }
 
+    public static void copyImageToBuffer(int[] pixelsSrc, ByteBuffer buffer, boolean alphaChannel) {
+        buffer.clear();
+
+        for (int argb : pixelsSrc) {
+            copyPixel(argb, buffer, alphaChannel);
+        }
+
+        buffer.flip();
+    }
+
     public static void copyImageToBuffer(BufferedImage img, ByteBuffer buffer) {
         copyImageToBuffer(img, buffer, false);
     }

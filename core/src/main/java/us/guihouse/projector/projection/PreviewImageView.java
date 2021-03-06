@@ -69,8 +69,8 @@ public class PreviewImageView extends ImageView implements Runnable {
         } else {
             running = true;
             repainting = false;
-            updateThread = new Thread(this);
-            updateThread.start();
+            //updateThread = new Thread(this);
+            //updateThread.start();
         }
     }
 
@@ -117,7 +117,7 @@ public class PreviewImageView extends ImageView implements Runnable {
                 AffineTransform old = targetGraphics.getTransform();
                 targetGraphics.translate(px, py);
                 targetGraphics.scale(scale, scale);
-                projectionCanvas.paintComponent(targetGraphics, main);
+                //projectionCanvas.paintComponent(targetGraphics, main);
                 targetGraphics.setTransform(old);
 
                 Platform.runLater(() -> {

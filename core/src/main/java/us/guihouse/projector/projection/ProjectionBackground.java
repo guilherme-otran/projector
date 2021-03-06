@@ -6,6 +6,7 @@
 package us.guihouse.projector.projection;
 
 import us.guihouse.projector.other.ProjectorPreferences;
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
 import us.guihouse.projector.projection.models.BackgroundModel;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
@@ -33,7 +34,7 @@ public class ProjectionBackground extends ProjectionImage {
     }
 
     @Override
-    public void paintComponent(Graphics2D g, VirtualScreen vs) {
+    public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         if (vs.isChromaScreen()) {
             g.setColor(chromaBgColor);
         } else {
