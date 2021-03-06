@@ -24,6 +24,9 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ProjectionVideo implements Projectable {
     private final CanvasDelegate delegate;
@@ -31,22 +34,29 @@ public class ProjectionVideo implements Projectable {
     protected MediaPlayer player;
 
     private int[] imageData;
-    private int[] freezeImageData;
+    protected int videoW = 0;
+    protected int videoH = 0;
+
+    private final ConcurrentHashMap<String, Integer> width = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> height = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> projectionX = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> projectionY = new ConcurrentHashMap<>();
 
     private int videoTex = 0;
     private int texW;
     private int texH;
 
     protected boolean firstFrame = false;
+    private boolean freeze = false;
 
-    protected int videoW = 0;
-    protected int videoH = 0;
+    private int[] freezeImageData;
+    private int freezeVideoW;
+    private int freezeVideoH;
 
-    private final HashMap<String, Integer> width = new HashMap<>();
-    private final HashMap<String, Integer> height = new HashMap<>();
-
-    private final HashMap<String, Integer> projectionX = new HashMap<>();
-    private final HashMap<String, Integer> projectionY = new HashMap<>();
+    private final ConcurrentHashMap<String, Integer> freezeWidth = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> freezeHeight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> freezeProjectionX = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> freezeProjectionY = new ConcurrentHashMap<>();
 
     @Getter
     private boolean cropVideo = false;
@@ -58,6 +68,8 @@ public class ProjectionVideo implements Projectable {
     protected ProjectionVideo.MyBufferFormatCallback bufferFormatCallback;
     protected CallbackVideoSurface videoSurface;
 
+    private Queue<int[]> frameBuffer = new ConcurrentLinkedQueue<>();
+
     public ProjectionVideo(CanvasDelegate delegate) {
         this.delegate = delegate;
     }
@@ -67,11 +79,6 @@ public class ProjectionVideo implements Projectable {
         if (videoW == 0 || videoH == 0) {
             return;
         }
-
-        width.clear();
-        height.clear();
-        projectionX.clear();
-        projectionY.clear();
 
         delegate.getVirtualScreens().forEach(vs -> {
             float scaleW = vs.getWidth() / (float) videoW;
@@ -116,19 +123,41 @@ public class ProjectionVideo implements Projectable {
 
     @Override
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
-        if (imageData == null && freezeImageData == null) {
-            return;
+        int[] data;
+
+        int rWidth;
+        int rHeight;
+        int rProjectionX;
+        int rProjectionY;
+
+        int videoW;
+        int videoH;
+
+        if (freeze) {
+            data = freezeImageData;
+
+            rWidth = freezeWidth.getOrDefault(vs.getVirtualScreenId(), 0);
+            rHeight = freezeHeight.getOrDefault(vs.getVirtualScreenId(), 0);
+            rProjectionX = freezeProjectionX.getOrDefault(vs.getVirtualScreenId(), 0);
+            rProjectionY = freezeProjectionY.getOrDefault(vs.getVirtualScreenId(), 0);
+
+            videoW = this.freezeVideoW;
+            videoH = this.freezeVideoH;
+        } else {
+            data = imageData;
+
+            rWidth = width.getOrDefault(vs.getVirtualScreenId(), 0);
+            rHeight = height.getOrDefault(vs.getVirtualScreenId(), 0);
+            rProjectionX = projectionX.getOrDefault(vs.getVirtualScreenId(), 0);
+            rProjectionY = projectionY.getOrDefault(vs.getVirtualScreenId(), 0);
+
+            videoW = this.videoW;
+            videoH = this.videoH;
         }
 
-        int rWidth = width.getOrDefault(vs.getVirtualScreenId(), 0);
-        int rHeight = height.getOrDefault(vs.getVirtualScreenId(), 0);
-
-        if (render.get() && rWidth > 0 && rHeight > 0) {
-            int videoW = this.videoW;
-            int videoH = this.videoH;
-            int[] data = freezeImageData != null ? freezeImageData : imageData;
-
+        if (render.get() && rWidth > 0 && rHeight > 0 && data != null) {
             if (videoW * videoH != data.length) {
+                System.out.println("here");
                 return;
             }
 
@@ -149,9 +178,6 @@ public class ProjectionVideo implements Projectable {
 
             GL30.glUnmapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER);
             GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
-
-            int rProjectionX = projectionX.getOrDefault(vs.getVirtualScreenId(), 0);
-            int rProjectionY = projectionY.getOrDefault(vs.getVirtualScreenId(), 0);
 
             g.setColor(Color.BLACK);
             g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
@@ -212,6 +238,8 @@ public class ProjectionVideo implements Projectable {
                 GL11.glDisable(GL11.GL_BLEND);
                 GL11.glDisable(GL11.GL_TEXTURE_2D);
             });
+        } else {
+            System.out.println("else");
         }
     }
 
@@ -220,21 +248,36 @@ public class ProjectionVideo implements Projectable {
     }
 
     public void freeze() {
-        freezeImageData = imageData;
-        firstFrame = true;
+        if (freeze) {
+            return;
+        }
+
+        freezeImageData = frameBuffer.peek();
+        freezeVideoW = videoW;
+        freezeVideoH = videoH;
+        freezeWidth.putAll(width);
+        freezeHeight.putAll(height);
+        freezeProjectionX.putAll(projectionX);
+        freezeProjectionY.putAll(projectionY);
+        freeze = true;
     }
 
     public void unfreeze() {
-        freezeImageData = null;
         rebuildLayout();
+        freeze = false;
     }
 
     protected void generateBuffer(int w, int h) {
         freeze();
+        firstFrame = true;
         videoW = w;
         videoH = h;
 
-        imageData = new int[w * h];
+        frameBuffer.clear();
+
+        for (int i=0; i<3; i++) {
+            frameBuffer.add(new int[w * h]);
+        }
     }
 
     @Override
@@ -252,10 +295,15 @@ public class ProjectionVideo implements Projectable {
 
         @Override
         public void display(MediaPlayer mediaPlayer, ByteBuffer[] nativeBuffers, BufferFormat bufferFormat) {
+            int[] imageData = frameBuffer.poll();
+            nativeBuffers[0].asIntBuffer().get(imageData);
+            frameBuffer.add(imageData);
+
+            ProjectionVideo.this.imageData = imageData;
+
             if (firstFrame) {
                 firstFrame = false;
             } else {
-                nativeBuffers[0].asIntBuffer().get(imageData);
                 unfreeze();
             }
         }
