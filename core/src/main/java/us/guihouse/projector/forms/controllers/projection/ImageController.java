@@ -305,8 +305,19 @@ public class ImageController extends ProjectionController implements Runnable {
         while (running) {
             long current = System.currentTimeMillis();
             double interval = changeMsecSlider.valueProperty().doubleValue() * 1000;
+            long intervalRound = Math.round(interval);
 
-            if (current - time < Math.round(interval)) {
+            if (intervalRound >= 120 * 1000) {
+                running = false;
+                break;
+            }
+
+            if (current - time < intervalRound) {
+                try {
+                    Thread.sleep(intervalRound - (current - time));
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 continue;
             }
 
@@ -327,12 +338,6 @@ public class ImageController extends ProjectionController implements Runnable {
             }
 
             Platform.runLater(() -> imagesList.getSelectionModel().clearAndSelect(nextIndex));
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
         }
     }
 

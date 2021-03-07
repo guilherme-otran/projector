@@ -5,14 +5,21 @@
  */
 package us.guihouse.projector.projection;
 
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
+import us.guihouse.projector.projection.glfw.RGBImageCopy;
 import us.guihouse.projector.projection.models.BackgroundProvide;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
 import java.awt.*;
-import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -24,10 +31,15 @@ public class ProjectionImage implements Projectable {
 
     private final Color bgColor;
 
-    private final HashMap<String, BufferedImage> scaledBackground = new HashMap<>();
+    private final ConcurrentHashMap<String, Rectangle> scales = new ConcurrentHashMap<>();
+
+    private BufferedImage image;
+    private BufferedImage texImage;
 
     private boolean cropBackground;
     private BackgroundProvide model;
+
+    private Integer tex = null;
 
     ProjectionImage(CanvasDelegate canvasDelegate) {
         this(canvasDelegate, new Color(0, 0, 0));
@@ -39,7 +51,7 @@ public class ProjectionImage implements Projectable {
     }
 
     public boolean isEmpty() {
-        return scaledBackground.isEmpty();
+        return image == null || scales.isEmpty();
     }
 
     @Override
@@ -48,31 +60,97 @@ public class ProjectionImage implements Projectable {
             return;
         }
 
+        if (texImage != image) {
+            texImage = image;
+
+            if (tex != null) {
+                int tex = this.tex;
+
+                g.getProvider().enqueueForDraw(() -> {
+                    g.getProvider().freeTex(tex);
+                });
+            }
+
+            tex = g.getProvider().dequeueTex();
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+            int width = texImage.getWidth();
+            int height = texImage.getHeight();
+
+            int size = width * height * 4;
+            ByteBuffer buffer = BufferUtils.createByteBuffer(size);
+            RGBImageCopy.copyImageToBuffer(texImage, buffer, true);
+
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        }
+
         g.setColor(bgColor);
         g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
 
-        BufferedImage render = scaledBackground.get(vs.getVirtualScreenId());
+        Composite composite = g.getComposite();
+        Rectangle position = scales.get(vs.getVirtualScreenId());
+        int tex = this.tex;
 
-        if (render != null) {
-            g.drawImage(render, 0, 0, null);
+        if (position == null) {
+            return;
         }
+
+        g.getProvider().enqueueForDraw(() -> {
+            GL11.glEnable(GL11.GL_BLEND);
+            GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+
+            GL11.glPushMatrix();
+            g.adjustOrtho();
+            g.updateAlpha(composite);
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+
+            GL11.glBegin(GL11.GL_QUADS);
+
+            GL11.glTexCoord2d(0, 0);
+            GL11.glVertex2d(position.getX(), position.getY());
+
+            GL11.glTexCoord2d(0, 1);
+            GL11.glVertex2d(position.getX(), position.getMaxY());
+
+            GL11.glTexCoord2d(1, 1);
+            GL11.glVertex2d(position.getMaxX(), position.getMaxY());
+
+            GL11.glTexCoord2d(1, 0);
+            GL11.glVertex2d(position.getMaxX(), position.getY());
+
+            GL11.glEnd();
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glPopMatrix();
+            GL11.glDisable(GL11.GL_BLEND);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+        });
+
     }
 
     @Override
     public void rebuildLayout() {
-        scaledBackground.clear();
+        scales.clear();
 
         if (model == null) {
             return;
         }
 
         if (model.getStaticBackground() != null) {
-            scaleBackground(model.getStaticBackground());
+            image = model.getStaticBackground();
+            scaleBackground(image);
         }
     }
 
     private void scaleBackground(BufferedImage img) {
-        scaledBackground.clear();
+        scales.clear();
 
         canvasDelegate.getVirtualScreens()
             .forEach(vs -> {
@@ -102,20 +180,7 @@ public class ProjectionImage implements Projectable {
                 int x = (width - newW) / 2;
                 int y = (height - newH) / 2;
 
-                AffineTransform at = new AffineTransform();
-                at.translate(x, y);
-                at.scale(backgroundScale, backgroundScale);
-
-                BufferedImage scaling = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g2 = scaling.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setTransform(at);
-                g2.drawImage(img, 0, 0, null);
-                g2.dispose();
-
-                this.scaledBackground.put(vs.getVirtualScreenId(), scaling);
+                scales.put(vs.getVirtualScreenId(), new Rectangle(x, y, newW, newH));
             });
     }
 
