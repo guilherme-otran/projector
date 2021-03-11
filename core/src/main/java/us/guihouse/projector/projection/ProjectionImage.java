@@ -84,7 +84,9 @@ public class ProjectionImage implements Projectable {
             ByteBuffer buffer = BufferUtils.createByteBuffer(size);
             RGBImageCopy.copyImageToBuffer(texImage, buffer, true);
 
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0);
+            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         }
 
@@ -110,24 +112,28 @@ public class ProjectionImage implements Projectable {
 
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
 
+            double x = position.getX();
+            double y = position.getY();
+            double maxX = position.getMaxX();
+            double maxY = position.getMaxY();
+
             GL11.glBegin(GL11.GL_QUADS);
 
             GL11.glTexCoord2d(0, 0);
-            GL11.glVertex2d(position.getX(), position.getY());
+            GL11.glVertex2d(x, y);
 
             GL11.glTexCoord2d(0, 1);
-            GL11.glVertex2d(position.getX(), position.getMaxY());
+            GL11.glVertex2d(x, maxY);
 
             GL11.glTexCoord2d(1, 1);
-            GL11.glVertex2d(position.getMaxX(), position.getMaxY());
+            GL11.glVertex2d(maxX, maxY);
 
             GL11.glTexCoord2d(1, 0);
-            GL11.glVertex2d(position.getMaxX(), position.getY());
+            GL11.glVertex2d(maxX, y);
 
             GL11.glEnd();
 
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
             GL11.glPopMatrix();
             GL11.glDisable(GL11.GL_BLEND);
             GL11.glDisable(GL11.GL_TEXTURE_2D);

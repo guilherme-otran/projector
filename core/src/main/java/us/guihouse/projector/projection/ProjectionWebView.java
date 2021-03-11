@@ -7,6 +7,8 @@ package us.guihouse.projector.projection;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import javafx.application.Platform;
@@ -16,7 +18,11 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
 import javafx.scene.web.WebView;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapter;
+import us.guihouse.projector.projection.glfw.RGBImageCopy;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
 import javax.swing.*;
@@ -33,7 +39,13 @@ public class ProjectionWebView implements Projectable {
     private Pane container;
     private WebView webView;
     private JFXPanel panel;
-    private final HashMap<String, AffineTransform> transforms = new HashMap<>();
+    private final HashMap<String, Rectangle> positions = new HashMap<>();
+    private Integer tex = null;
+    private BufferedImage source;
+    private Graphics sourceGraphics;
+
+    private int texW;
+    private int texH;
 
     public ProjectionWebView(CanvasDelegate delegate) {
         this.delegate = delegate;
@@ -41,18 +53,103 @@ public class ProjectionWebView implements Projectable {
 
     @Override
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+        if (sourceGraphics != null) {
+            panel.paint(sourceGraphics);
+        }
+
+        BufferedImage source = this.source;
+
+        if (source == null) {
+            return;
+        }
+
+        int width = source.getWidth();
+        int height = source.getHeight();
+
+        int buffer = g.getProvider().dequeueGlBuffer();
+        GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
+
+        GL30.glBufferData(
+                GL30.GL_PIXEL_UNPACK_BUFFER,
+                (long) width * height * 4,
+                GL30.GL_STREAM_DRAW
+        );
+
+        ByteBuffer destination = GL30.glMapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, GL30.GL_WRITE_ONLY);
+
+        if (destination != null) {
+            RGBImageCopy.copyImageToBuffer(source, destination, true);
+        }
+
+        GL30.glUnmapBuffer(GL30.GL_PIXEL_UNPACK_BUFFER);
+        GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
 
-        AffineTransform old = g.getTransform();
+        Rectangle position = positions.get(vs.getVirtualScreenId());
 
-        AffineTransform dst = g.getTransform();
-        dst.concatenate(transforms.get(vs.getVirtualScreenId()));
-        g.setTransform(dst);
+        if (position == null) {
+            return;
+        }
 
-        panel.paint(g);
+        Composite composite = g.getComposite();
 
-        g.setTransform(old);
+        g.getProvider().enqueueForDraw(() -> {
+            GL11.glEnable(GL11.GL_BLEND);
+            GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+
+            if (tex == null) {
+                tex = g.getProvider().dequeueTex();
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            }
+
+            GL11.glPushMatrix();
+            g.adjustOrtho();
+            g.updateAlpha(composite);
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
+
+            if (width != texW || height != texH) {
+                GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
+                texW = width;
+                texH = height;
+            } else {
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
+            }
+
+            GL11.glBegin(GL11.GL_QUADS);
+
+            GL11.glTexCoord2d(0, 0);
+            GL11.glVertex2d(position.getX(), position.getY());
+
+            GL11.glTexCoord2d(0, 1);
+            GL11.glVertex2d(position.getX(), position.getMaxY());
+
+            GL11.glTexCoord2d(1, 1);
+            GL11.glVertex2d(position.getMaxX(), position.getMaxY());
+
+            GL11.glTexCoord2d(1, 0);
+            GL11.glVertex2d(position.getMaxX(), position.getY());
+
+            GL11.glEnd();
+
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glPopMatrix();
+            GL11.glDisable(GL11.GL_BLEND);
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+        });
+
     }
 
     @Override
@@ -60,7 +157,12 @@ public class ProjectionWebView implements Projectable {
         int width = delegate.getMainWidth();
         int height = delegate.getMainHeight();
 
-        transforms.clear();
+        if (sourceGraphics != null) {
+            sourceGraphics.dispose();
+        }
+
+        source = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        sourceGraphics = source.createGraphics();
 
         delegate.getVirtualScreens().forEach(vs -> {
             float scaleX = vs.getWidth() / (float) width;
@@ -74,11 +176,7 @@ public class ProjectionWebView implements Projectable {
             int x = (vs.getWidth() - scaledWidth) / 2;
             int y = (vs.getHeight() - scaledHeight) / 2;
 
-            AffineTransform t = new AffineTransform();
-            t.translate(x, y);
-            t.scale(scale, scale);
-
-            transforms.put(vs.getVirtualScreenId(), t);
+            positions.put(vs.getVirtualScreenId(), new Rectangle(x, y, scaledWidth, scaledHeight));
         });
 
         Platform.runLater(() -> {

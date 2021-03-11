@@ -30,17 +30,17 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
 
     private lateinit var drawer: GLFWGraphicsAdapterDrawer
 
-    fun init() {
+    fun init(glShare: Long?): Long {
         bounds = Rectangle(virtualScreen.width, virtualScreen.height)
 
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE)
-        glWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS", MemoryUtil.NULL, 0)
+        glWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS", MemoryUtil.NULL, glShare ?: 0)
 
         if (glWindow == 0L) {
             throw RuntimeException("Cannot create GLFW window")
         }
 
-        glDrawerWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS Draw", MemoryUtil.NULL, glWindow)
+        glDrawerWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS Draw", MemoryUtil.NULL, glShare ?: glWindow)
 
         if (glDrawerWindow == 0L) {
             throw RuntimeException("Cannot create GLFW drawer window")
@@ -49,7 +49,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
         drawer = GLFWGraphicsAdapterDrawer(glDrawerWindow, projectionCanvas, bounds!!, virtualScreen)
 
         windows.values.forEach {
-            it.createWindow(glWindow)
+            it.createWindow(glShare ?: glWindow)
         }
 
         eventQueue.setStartRunnable(Starter())
@@ -57,6 +57,8 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
 
         drawer.init()
         eventQueue.init()
+
+        return glShare ?: glWindow
     }
 
     internal inner class Starter : Runnable {

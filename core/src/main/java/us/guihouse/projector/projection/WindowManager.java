@@ -99,7 +99,11 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
         });
 
         GLFWHelper.invokeLater(() -> {
-            glfwVirtualScreens.values().forEach(GLFWVirtualScreen::init);
+            Long glShare = null;
+
+            for (GLFWVirtualScreen glfwVirtualScreen : glfwVirtualScreens.values()) {
+                glShare = glfwVirtualScreen.init(glShare);
+            }
 
             starting = false;
 
