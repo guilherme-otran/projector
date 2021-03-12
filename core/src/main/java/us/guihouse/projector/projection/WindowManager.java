@@ -5,15 +5,14 @@ import java.util.*;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import javafx.application.Platform;
 import javafx.scene.image.ImageView;
 import lombok.Getter;
 import lombok.Setter;
 import us.guihouse.projector.models.WindowConfig;
 import us.guihouse.projector.other.GraphicsFinder;
-import us.guihouse.projector.projection.glfw.GLFWHelper;
-import us.guihouse.projector.projection.glfw.GLFWVirtualScreen;
-import us.guihouse.projector.projection.glfw.GLFWWindow;
-import us.guihouse.projector.projection.glfw.GLFWWindowBuilder;
+import us.guihouse.projector.projection.glfw.*;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.services.SettingsService;
 import us.guihouse.projector.utils.WindowConfigsLoader;
@@ -82,7 +81,6 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
         running = true;
         starting = true;
 
-        projectionCanvas.init();
         preview.setProjectionCanvas(projectionCanvas);
 
         virtualScreens.forEach((id, virtualScreen) -> {
@@ -99,17 +97,19 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
         });
 
         GLFWHelper.invokeLater(() -> {
-            Long glShare = null;
-
             for (GLFWVirtualScreen glfwVirtualScreen : glfwVirtualScreens.values()) {
-                glShare = glfwVirtualScreen.init(glShare);
+                glfwVirtualScreen.init();
             }
 
             starting = false;
 
-            if (initializationCallback != null) {
-                initializationCallback.run();
-            }
+            Platform.runLater(() -> {
+                projectionCanvas.init();
+
+                if (initializationCallback != null) {
+                    initializationCallback.run();
+                }
+            });
         });
     }
 
@@ -161,7 +161,13 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
     public GraphicsDevice getDefaultDevice() {
         return defaultDevice;
     }
-    
+
+    @Override
+    public void runOnProvider(VirtualScreen vs, GLFWGraphicsAdapterProvider.Callback callback) {
+        GLFWVirtualScreen glfwVirtualScreen = glfwVirtualScreens.get(vs.getVirtualScreenId());
+        glfwVirtualScreen.runOnProvider(callback);
+    }
+
     public WindowConfigsLoader getWindowConfigsLoader() {
         return configLoader;
     }

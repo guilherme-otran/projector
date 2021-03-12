@@ -28,37 +28,41 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
     private var glFrameBuffer = 0
     private var glDepthRenderBuffer = 0
 
-    private lateinit var drawer: GLFWGraphicsAdapterDrawer
+    private val drawer = GLFWGraphicsAdapterDrawer()
 
-    fun init(glShare: Long?): Long {
+    fun init(): Long {
         bounds = Rectangle(virtualScreen.width, virtualScreen.height)
 
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE)
-        glWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS", MemoryUtil.NULL, glShare ?: 0)
+        glWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS", MemoryUtil.NULL, 0)
 
         if (glWindow == 0L) {
             throw RuntimeException("Cannot create GLFW window")
         }
 
-        glDrawerWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS Draw", MemoryUtil.NULL, glShare ?: glWindow)
+        glDrawerWindow = GLFW.glfwCreateWindow(640, 480, "Projector VS Draw", MemoryUtil.NULL, glWindow)
 
         if (glDrawerWindow == 0L) {
             throw RuntimeException("Cannot create GLFW drawer window")
         }
 
-        drawer = GLFWGraphicsAdapterDrawer(glDrawerWindow, projectionCanvas, bounds!!, virtualScreen)
-
         windows.values.forEach {
-            it.createWindow(glShare ?: glWindow)
+            it.createWindow(glWindow)
         }
 
         eventQueue.setStartRunnable(Starter())
         eventQueue.setStopRunnable(Stopper())
 
-        drawer.init()
+        drawer.init(glDrawerWindow, projectionCanvas, bounds!!, virtualScreen)
         eventQueue.init()
 
-        return glShare ?: glWindow
+        return glWindow
+    }
+
+    fun runOnProvider(callback: GLFWGraphicsAdapterProvider.Callback) {
+        drawer.enqueueForRun {
+            callback.run(drawer)
+        }
     }
 
     internal inner class Starter : Runnable {

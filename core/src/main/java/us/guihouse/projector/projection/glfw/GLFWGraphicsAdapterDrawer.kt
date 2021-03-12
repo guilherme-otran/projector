@@ -15,10 +15,12 @@ import org.lwjgl.opengl.GL30
 import java.util.concurrent.ConcurrentLinkedQueue
 
 
-class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
-                                private val projectionCanvas: ProjectionCanvas,
-                                bounds: Rectangle,
-                                private val virtualScreen: VirtualScreen) : EventQueue(), GLFWGraphicsAdapterProvider {
+class GLFWGraphicsAdapterDrawer() : EventQueue(), GLFWGraphicsAdapterProvider {
+
+    private var glWindow: Long = 0
+    private lateinit var projectionCanvas: ProjectionCanvas
+    private lateinit var bounds: Rectangle
+    private lateinit var virtualScreen: VirtualScreen
 
     companion object {
         const val BUFFER_LIMIT = 3
@@ -36,7 +38,9 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
 
     private val freeMultiFrameGlBuffers = ConcurrentLinkedQueue<Int>()
 
-    private val graphicsAdapter = GLFWGraphicsAdapter(bounds, this)
+    private val freePendingTexes = ConcurrentLinkedQueue<Int>()
+
+    private lateinit var graphicsAdapter: GLFWGraphicsAdapter
 
     private val allocatedTex = ArrayList<Int>()
 
@@ -47,6 +51,15 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
             currentFrame?.let {
                 it.draws.clear()
                 projectionCanvas.paintComponent(graphicsAdapter, virtualScreen)
+                enqueueForDraw {
+                    var tex: Int? = freePendingTexes.poll()
+
+                    while (tex != null) {
+                        GL11.glDeleteTextures(tex)
+                        allocatedTex.remove(tex)
+                        tex = freePendingTexes.poll()
+                    }
+                }
                 filledFrameBuffer.add(it)
             }
         }
@@ -83,8 +96,7 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
     }
 
     override fun freeTex(videoTex: Int) {
-        GL11.glDeleteTextures(videoTex)
-        allocatedTex.remove(videoTex)
+        freePendingTexes.add(videoTex)
     }
 
     fun drawNextFrame() {
@@ -104,7 +116,13 @@ class GLFWGraphicsAdapterDrawer(private val glWindow: Long,
         }
     }
 
-    override fun init() {
+    fun init(glWindow: Long, projectionCanvas: ProjectionCanvas, bounds: Rectangle, virtualScreen: VirtualScreen) {
+        this.glWindow = glWindow
+        this.projectionCanvas = projectionCanvas
+        this.bounds = bounds
+        this.virtualScreen = virtualScreen
+        this.graphicsAdapter = GLFWGraphicsAdapter(bounds, this)
+
         for (i in 1..BUFFER_LIMIT) {
             freeFrameBuffer.add(Frame(LinkedList(), LinkedList()))
         }

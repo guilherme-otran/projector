@@ -43,6 +43,7 @@ public class ProjectionWebView implements Projectable {
     private Integer tex = null;
     private BufferedImage source;
     private Graphics sourceGraphics;
+    private boolean painting = false;
 
     private int texW;
     private int texH;
@@ -53,8 +54,15 @@ public class ProjectionWebView implements Projectable {
 
     @Override
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
-        if (sourceGraphics != null) {
-            panel.paint(sourceGraphics);
+        if (!painting) {
+            painting = true;
+
+            SwingUtilities.invokeLater(() -> {
+                if (sourceGraphics != null) {
+                    panel.paint(sourceGraphics);
+                }
+                painting = false;
+            });
         }
 
         BufferedImage source = this.source;

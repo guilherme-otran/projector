@@ -6,6 +6,7 @@ import lombok.Getter;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.w3c.dom.css.Rect;
 import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import uk.co.caprica.vlcj.player.embedded.videosurface.CallbackVideoSurface;
 import uk.co.caprica.vlcj.player.embedded.videosurface.callback.BufferFormat;
@@ -37,14 +38,8 @@ public class ProjectionVideo implements Projectable {
     protected int videoW = 0;
     protected int videoH = 0;
 
-    private final ConcurrentHashMap<String, Integer> width = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> height = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> projectionX = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> projectionY = new ConcurrentHashMap<>();
-
-    private int videoTex = 0;
-    private int texW;
-    private int texH;
+    private final ConcurrentHashMap<String, Integer> texes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Rectangle> positions = new ConcurrentHashMap<>();
 
     protected boolean firstFrame = false;
     private boolean freeze = false;
@@ -53,10 +48,7 @@ public class ProjectionVideo implements Projectable {
     private int freezeVideoW;
     private int freezeVideoH;
 
-    private final ConcurrentHashMap<String, Integer> freezeWidth = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> freezeHeight = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> freezeProjectionX = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> freezeProjectionY = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Rectangle> freezePositions = new ConcurrentHashMap<>();
 
     @Getter
     private boolean cropVideo = false;
@@ -81,25 +73,45 @@ public class ProjectionVideo implements Projectable {
         }
 
         delegate.getVirtualScreens().forEach(vs -> {
-            float scaleW = vs.getWidth() / (float) videoW;
-            float scaleH = vs.getHeight() / (float) videoH;
+            delegate.runOnProvider(vs, provider -> {
+                freeze = false;
+                float scaleW = vs.getWidth() / (float) videoW;
+                float scaleH = vs.getHeight() / (float) videoH;
 
-            float scale;
+                float scale;
 
-            if (cropVideo) {
-                scale = Math.max(scaleW, scaleH);
-            } else {
-                scale = Math.min(scaleW, scaleH);
-            }
+                if (cropVideo) {
+                    scale = Math.max(scaleW, scaleH);
+                } else {
+                    scale = Math.min(scaleW, scaleH);
+                }
 
-            int scaledWidth = Math.round(scale * videoW);
-            int scaledHeight = Math.round(scale * videoH);
+                int scaledWidth = Math.round(scale * videoW);
+                int scaledHeight = Math.round(scale * videoH);
+                int x = (vs.getWidth() - scaledWidth) / 2;
+                int y = (vs.getHeight() - scaledHeight) / 2;
 
-            width.put(vs.getVirtualScreenId(), scaledWidth);
-            height.put(vs.getVirtualScreenId(), scaledHeight);
+                Rectangle position = new Rectangle(x, y, scaledWidth, scaledHeight);
+                positions.put(vs.getVirtualScreenId(), position);
 
-            projectionX.put(vs.getVirtualScreenId(), (vs.getWidth() - scaledWidth) / 2);
-            projectionY.put(vs.getVirtualScreenId(), (vs.getHeight() - scaledHeight) / 2);
+                Integer oldTex = texes.get(vs.getVirtualScreenId());
+
+                if (oldTex != null) {
+                    provider.freeTex(oldTex);
+                }
+
+                int tex = provider.dequeueTex();
+                texes.put(vs.getVirtualScreenId(), tex);
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+                GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, videoW, videoH, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+            });
         });
     }
 
@@ -125,10 +137,7 @@ public class ProjectionVideo implements Projectable {
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
         int[] data;
 
-        int rWidth;
-        int rHeight;
-        int rProjectionX;
-        int rProjectionY;
+        Rectangle position;
 
         int videoW;
         int videoH;
@@ -136,28 +145,23 @@ public class ProjectionVideo implements Projectable {
         if (freeze) {
             data = freezeImageData;
 
-            rWidth = freezeWidth.getOrDefault(vs.getVirtualScreenId(), 0);
-            rHeight = freezeHeight.getOrDefault(vs.getVirtualScreenId(), 0);
-            rProjectionX = freezeProjectionX.getOrDefault(vs.getVirtualScreenId(), 0);
-            rProjectionY = freezeProjectionY.getOrDefault(vs.getVirtualScreenId(), 0);
+            position = freezePositions.get(vs.getVirtualScreenId());
 
             videoW = this.freezeVideoW;
             videoH = this.freezeVideoH;
         } else {
             data = imageData;
 
-            rWidth = width.getOrDefault(vs.getVirtualScreenId(), 0);
-            rHeight = height.getOrDefault(vs.getVirtualScreenId(), 0);
-            rProjectionX = projectionX.getOrDefault(vs.getVirtualScreenId(), 0);
-            rProjectionY = projectionY.getOrDefault(vs.getVirtualScreenId(), 0);
+            position = positions.get(vs.getVirtualScreenId());
 
             videoW = this.videoW;
             videoH = this.videoH;
         }
 
-        if (render.get() && rWidth > 0 && rHeight > 0 && data != null) {
+        Integer videoTex = texes.get(vs.getVirtualScreenId());
+
+        if (render.get() && position != null && data != null && videoTex != null) {
             if (videoW * videoH != data.length) {
-                System.out.println("here");
                 return;
             }
 
@@ -189,17 +193,6 @@ public class ProjectionVideo implements Projectable {
                 GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
                 GL11.glEnable(GL11.GL_TEXTURE_2D);
 
-                if (videoTex == 0) {
-                    videoTex = g.getProvider().dequeueTex();
-
-                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, videoTex);
-
-                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-
-                    GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-                }
-
                 GL11.glPushMatrix();
                 g.adjustOrtho();
                 g.updateAlpha(composite);
@@ -208,27 +201,21 @@ public class ProjectionVideo implements Projectable {
 
                 GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
 
-                if (videoW != texW || videoH != texH) {
-                    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, videoW, videoH, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
-                    texW = videoW;
-                    texH = videoH;
-                } else {
-                    GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, videoW, videoH, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
-                }
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, videoW, videoH, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
 
                 GL11.glBegin(GL11.GL_QUADS);
 
                 GL11.glTexCoord2d(0, 0);
-                GL11.glVertex2i(rProjectionX, rProjectionY);
+                GL11.glVertex2d(position.getX(), position.getY());
 
                 GL11.glTexCoord2d(0, 1);
-                GL11.glVertex2i(rProjectionX, rProjectionY + rHeight);
+                GL11.glVertex2d(position.getX(), position.getMaxY());
 
                 GL11.glTexCoord2d(1, 1);
-                GL11.glVertex2i(rProjectionX + rWidth, rProjectionY + rHeight);
+                GL11.glVertex2d(position.getMaxX(), position.getMaxY());
 
                 GL11.glTexCoord2d(1, 0);
-                GL11.glVertex2i(rProjectionX + rWidth, rProjectionY);
+                GL11.glVertex2d(position.getMaxX(), position.getY());
 
                 GL11.glEnd();
 
@@ -238,8 +225,6 @@ public class ProjectionVideo implements Projectable {
                 GL11.glDisable(GL11.GL_BLEND);
                 GL11.glDisable(GL11.GL_TEXTURE_2D);
             });
-        } else {
-            System.out.println("else");
         }
     }
 
@@ -255,16 +240,12 @@ public class ProjectionVideo implements Projectable {
         freezeImageData = frameBuffer.peek();
         freezeVideoW = videoW;
         freezeVideoH = videoH;
-        freezeWidth.putAll(width);
-        freezeHeight.putAll(height);
-        freezeProjectionX.putAll(projectionX);
-        freezeProjectionY.putAll(projectionY);
+        freezePositions.putAll(positions);
         freeze = true;
     }
 
     public void unfreeze() {
         rebuildLayout();
-        freeze = false;
     }
 
     protected void generateBuffer(int w, int h) {

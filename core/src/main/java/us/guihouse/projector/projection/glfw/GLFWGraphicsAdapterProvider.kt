@@ -7,4 +7,8 @@ interface GLFWGraphicsAdapterProvider {
     fun freeMultiFrameGlBuffer(glBuffer: Int)
     fun dequeueTex(): Int
     fun freeTex(videoTex: Int)
+
+    interface Callback {
+        fun run(provider: GLFWGraphicsAdapterProvider)
+    }
 }

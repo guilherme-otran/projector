@@ -8,6 +8,7 @@ package us.guihouse.projector.projection;
 import java.awt.GraphicsDevice;
 import java.util.List;
 
+import us.guihouse.projector.projection.glfw.GLFWGraphicsAdapterProvider;
 import us.guihouse.projector.projection.models.VirtualScreen;
 import us.guihouse.projector.services.SettingsService;
 
@@ -28,4 +29,6 @@ public interface CanvasDelegate {
     SettingsService getSettingsService();
 
     GraphicsDevice getDefaultDevice();
+
+    void runOnProvider(VirtualScreen vs, GLFWGraphicsAdapterProvider.Callback callback);
 }
