@@ -48,7 +48,7 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
 
         projectionCanvas = new ProjectionCanvas(this);
 
-        preview = new PreviewImageView(this);
+        preview = new PreviewImageView();
 
         configLoader = new WindowConfigsLoader(this);
     }
@@ -63,8 +63,6 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
 
     private void stopEngine() {
         configLoader.stop();
-
-        preview.setProjectionCanvas(null);
 
         glfwVirtualScreens.values().forEach(GLFWVirtualScreen::shutdown);
     }
@@ -81,8 +79,6 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
         running = true;
         starting = true;
 
-        preview.setProjectionCanvas(projectionCanvas);
-
         virtualScreens.forEach((id, virtualScreen) -> {
             HashMap<String, GLFWWindow> vsWindows = new HashMap<>();
 
@@ -92,7 +88,15 @@ public class WindowManager implements CanvasDelegate, WindowConfigsLoader.Window
 
             vsWindowConfigs.keySet().forEach(displayID -> vsWindows.put(displayID, windows.get(displayID)));
 
-            GLFWVirtualScreen glfwVirtualScreen = new GLFWVirtualScreen(projectionCanvas, virtualScreen, vsWindows, vsWindowConfigs);
+            GLFWPreviewWindow previewWindow;
+
+            if (virtualScreen.isMainScreen()) {
+                previewWindow = new GLFWPreviewWindow(preview);
+            }  else {
+                previewWindow = null;
+            }
+
+            GLFWVirtualScreen glfwVirtualScreen = new GLFWVirtualScreen(projectionCanvas, virtualScreen, vsWindows, vsWindowConfigs, previewWindow);
             glfwVirtualScreens.put(id, glfwVirtualScreen);
         });
 

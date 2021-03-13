@@ -14,7 +14,11 @@ import us.guihouse.projector.projection.models.VirtualScreen
 import java.awt.Rectangle
 import java.lang.RuntimeException
 
-class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private val virtualScreen: VirtualScreen, private val windows: Map<String, GLFWWindow>, private val windowConfigs: Map<String, WindowConfig>) {
+class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas,
+                        private val virtualScreen: VirtualScreen,
+                        private val windows: Map<String, GLFWWindow>,
+                        private val windowConfigs: Map<String, WindowConfig>,
+                        private val previewWindow: GLFWPreviewWindow?) {
     private val eventQueue = EventQueue(5)
 
     private var glWindow = 0L
@@ -49,6 +53,9 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
         windows.values.forEach {
             it.createWindow(glWindow)
         }
+
+        previewWindow?.createWindow(glWindow)
+        previewWindow?.init(virtualScreen)
 
         eventQueue.setStartRunnable(Starter())
         eventQueue.setStopRunnable(Stopper())
@@ -140,6 +147,9 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
             drawer.drawNextFrame()
 
             GL30.glPopMatrix()
+
+            previewWindow?.loopCycle()
+
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0)
 
             windows.values.forEach { it.loopCycle(glTexture) }
@@ -152,6 +162,7 @@ class GLFWVirtualScreen(private val projectionCanvas: ProjectionCanvas, private 
         override fun run() {
             eventQueue.removeContinuous(looper)
             drawer.stop()
+            previewWindow?.shutdown()
             GL11.glDeleteTextures(glTexture)
             GL30.glDeleteRenderbuffers(glDepthRenderBuffer)
             GL30.glDeleteFramebuffers(glFrameBuffer)

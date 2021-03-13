@@ -9,123 +9,80 @@ import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
+import org.jetbrains.annotations.NotNull;
+import us.guihouse.projector.projection.glfw.GLFWPreviewWindowCallback;
 import us.guihouse.projector.projection.models.VirtualScreen;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.nio.IntBuffer;
 
 
 /**
  *
  * @author guilherme
  */
-public class PreviewImageView extends ImageView implements Runnable {
-    private final CanvasDelegate delegate;
-    private ProjectionCanvas projectionCanvas;
-
-    private BufferedImage targetRender;
-    private Graphics2D targetGraphics;
+public class PreviewImageView extends ImageView implements GLFWPreviewWindowCallback {
     private WritableImage fxTargetRender;
+    private BufferedImage previewImage;
+    private boolean rendering = false;
 
-    private boolean repainting = false;
-    private boolean running = false;
-    private Thread updateThread = null;
-
-    public PreviewImageView(CanvasDelegate delegate) {
-        this.delegate = delegate;
+    public PreviewImageView() {
         setPreserveRatio(true);
     }
 
-    private void updateTargetRenderIfNeeded() {
-        int width = delegate.getMainWidth();
-        int height = delegate.getMainHeight();
-
-        if (targetRender == null || targetRender.getWidth() != width || targetRender.getHeight() != height) {
-            if (targetGraphics != null) {
-                targetGraphics.dispose();
-            }
-
-            targetRender = delegate.getDefaultDevice().getDefaultConfiguration().createCompatibleImage(width, height);
-            targetGraphics = targetRender.createGraphics();
-
-            fxTargetRender = new WritableImage(width, height);
-        }
-    }
-
-    void setProjectionCanvas(ProjectionCanvas projectionCanvas) {
-        this.projectionCanvas = projectionCanvas;
-
-        if (projectionCanvas == null) {
-            running = false;
-            if (updateThread != null) {
-                try {
-                    updateThread.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                updateThread = null;
-            }
-        } else {
-            running = true;
-            repainting = false;
-            //updateThread = new Thread(this);
-            //updateThread.start();
-        }
-    }
-
-    @SuppressWarnings("BusyWait")
     @Override
-    public void run() {
-        while (running) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                running = false;
-                e.printStackTrace();
+    public void create(int width, int height) {
+        Platform.runLater(() -> {
+            if (fxTargetRender == null || fxTargetRender.getWidth() != width || fxTargetRender.getHeight() != height) {
+                rendering = false;
+                fxTargetRender = new WritableImage(width, height);
+                previewImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+                setImage(fxTargetRender);
             }
+        });
+    }
 
-            if (repainting) {
-                continue;
-            }
-
-            repainting = true;
-
-            updateTargetRenderIfNeeded();
-
-            int width = targetRender.getWidth();
-            int height = targetRender.getHeight();
-
-            targetGraphics.setColor(Color.BLACK);
-            targetGraphics.fillRect(0, 0, width, height);
-
-            VirtualScreen main = delegate.getVirtualScreens().stream().filter(VirtualScreen::isMainScreen).findFirst().orElse(null);
-
-            if (projectionCanvas != null && main != null) {
-                int dw = delegate.getMainWidth();
-                int dh = delegate.getMainHeight();
-
-                double scaleX = width / (double) dw;
-                double scaleY = height / (double) dh;
-                double scale = Math.min(scaleX, scaleY);
-
-                int pw = (int) Math.round(dw * scale);
-                int ph = (int) Math.round(dh * scale);
-                int px = (width - pw) / 2;
-                int py = (height - ph) / 2;
-
-                AffineTransform old = targetGraphics.getTransform();
-                targetGraphics.translate(px, py);
-                targetGraphics.scale(scale, scale);
-                //projectionCanvas.paintComponent(targetGraphics, main);
-                targetGraphics.setTransform(old);
-
-                Platform.runLater(() -> {
-                    //SwingFXUtils.toFXImage(targetRender, fxTargetRender);
-                    //setImage(fxTargetRender);
-                    repainting = false;
-                });
-            }
+    @Override
+    public void onDisplay(@NotNull byte[] data) {
+        if (rendering) {
+            return;
         }
+
+        rendering = true;
+
+        Platform.runLater(() -> {
+            if (previewImage != null) {
+                int width = previewImage.getWidth();
+                int height = previewImage.getHeight();
+
+                int[] imgData = ((DataBufferInt)previewImage.getRaster().getDataBuffer()).getData();
+
+                if (width * height * 3 == data.length) {
+                    for (int y = 0; y < height; y++) {
+                        for (int x = 0; x < width; x++) {
+                            int i = (((height - y - 1) * width) + x) * 3;
+                            int imgI = (y * width) + x;
+
+                            byte r = data[i];
+                            byte g = data[i+1];
+                            byte b = data[i+2];
+
+                            imgData[imgI] = convertColor(r, g, b);
+                        }
+                    }
+                }
+
+                SwingFXUtils.toFXImage(previewImage, fxTargetRender);
+            }
+
+            rendering = false;
+        });
+    }
+
+    private int convertColor(byte r, byte g, byte b) {
+        return 0xFF << 24 | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
     }
 }
