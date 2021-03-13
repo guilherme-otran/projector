@@ -51,17 +51,23 @@ class GLFWGraphicsAdapterDrawer() : EventQueue(), GLFWGraphicsAdapterProvider {
             currentFrame?.let {
                 it.draws.clear()
                 projectionCanvas.paintComponent(graphicsAdapter, virtualScreen)
-                enqueueForDraw {
-                    var tex: Int? = freePendingTexes.poll()
-
-                    while (tex != null) {
-                        GL11.glDeleteTextures(tex)
-                        allocatedTex.remove(tex)
-                        tex = freePendingTexes.poll()
-                    }
-                }
+                freeTexes()
                 filledFrameBuffer.add(it)
             }
+        }
+    }
+
+    private fun freeTexes() {
+        var tex: Int? = freePendingTexes.poll()
+
+        while (tex != null) {
+            val texCopy = tex
+
+            enqueueForDraw {
+                GL11.glDeleteTextures(texCopy)
+                allocatedTex.remove(texCopy)
+            }
+            tex = freePendingTexes.poll()
         }
     }
 

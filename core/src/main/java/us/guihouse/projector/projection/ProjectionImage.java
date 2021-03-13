@@ -34,12 +34,11 @@ public class ProjectionImage implements Projectable {
     private final ConcurrentHashMap<String, Rectangle> scales = new ConcurrentHashMap<>();
 
     private BufferedImage image;
-    private BufferedImage texImage;
 
     private boolean cropBackground;
     private BackgroundProvide model;
 
-    private Integer tex = null;
+    private HashMap<String, Integer> texes = new HashMap<>();
 
     ProjectionImage(CanvasDelegate canvasDelegate) {
         this(canvasDelegate, new Color(0, 0, 0));
@@ -60,46 +59,22 @@ public class ProjectionImage implements Projectable {
             return;
         }
 
-        if (texImage != image) {
-            texImage = image;
+        Integer tex = texes.get(vs.getVirtualScreenId());
 
-            if (tex != null) {
-                int tex = this.tex;
+        if (tex == null) {
+            return;
+        }
 
-                g.getProvider().enqueueForDraw(() -> {
-                    g.getProvider().freeTex(tex);
-                });
-            }
+        Rectangle position = scales.get(vs.getVirtualScreenId());
 
-            tex = g.getProvider().dequeueTex();
-
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-
-            int width = texImage.getWidth();
-            int height = texImage.getHeight();
-
-            int size = width * height * 4;
-            ByteBuffer buffer = BufferUtils.createByteBuffer(size);
-            RGBImageCopy.copyImageToBuffer(texImage, buffer, true);
-
-            GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0);
-            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        if (position == null) {
+            return;
         }
 
         g.setColor(bgColor);
         g.fillRect(0, 0, vs.getWidth(), vs.getHeight());
 
         Composite composite = g.getComposite();
-        Rectangle position = scales.get(vs.getVirtualScreenId());
-        int tex = this.tex;
-
-        if (position == null) {
-            return;
-        }
 
         g.getProvider().enqueueForDraw(() -> {
             GL11.glEnable(GL11.GL_BLEND);
@@ -152,7 +127,42 @@ public class ProjectionImage implements Projectable {
         if (model.getStaticBackground() != null) {
             image = model.getStaticBackground();
             scaleBackground(image);
+            generateTexes();
         }
+    }
+
+    private void generateTexes() {
+        BufferedImage image = this.image;
+
+        canvasDelegate.getVirtualScreens().forEach(vs -> {
+            canvasDelegate.runOnProvider(vs, provider -> {
+                Integer tex = texes.remove(vs.getVirtualScreenId());
+
+                if (tex != null) {
+                    provider.freeTex(tex);
+                }
+
+                tex = provider.dequeueTex();
+
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, tex);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+                GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+
+                int width = image.getWidth();
+                int height = image.getHeight();
+
+                int size = width * height * 4;
+                ByteBuffer buffer = BufferUtils.createByteBuffer(size);
+                RGBImageCopy.copyImageToBuffer(image, buffer, true);
+
+                GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+                GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0);
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buffer);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+
+                texes.put(vs.getVirtualScreenId(), tex);
+            });
+        });
     }
 
     private void scaleBackground(BufferedImage img) {

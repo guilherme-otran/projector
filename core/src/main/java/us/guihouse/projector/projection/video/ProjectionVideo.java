@@ -62,6 +62,8 @@ public class ProjectionVideo implements Projectable {
 
     private Queue<int[]> frameBuffer = new ConcurrentLinkedQueue<>();
 
+    private boolean finished;
+
     public ProjectionVideo(CanvasDelegate delegate) {
         this.delegate = delegate;
     }
@@ -117,6 +119,7 @@ public class ProjectionVideo implements Projectable {
 
     @Override
     public void init() {
+        finished = false;
         renderCallback = new ProjectionVideo.MyRenderCallback();
         bufferFormatCallback = new ProjectionVideo.MyBufferFormatCallback();
 
@@ -135,6 +138,10 @@ public class ProjectionVideo implements Projectable {
 
     @Override
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+        if (finished) {
+            return;
+        }
+
         int[] data;
 
         Rectangle position;
@@ -263,7 +270,16 @@ public class ProjectionVideo implements Projectable {
 
     @Override
     public void finish() {
+        finished = true;
+
         this.player.release();
+
+        delegate.getVirtualScreens().forEach(vs -> {
+            Integer tex = texes.remove(vs.getVirtualScreenId());
+            if (tex != null) {
+                delegate.runOnProvider(vs, provider -> provider.freeTex(tex));
+            }
+        });
     }
 
     public MediaPlayer getPlayer() {

@@ -40,13 +40,15 @@ public class ProjectionWebView implements Projectable {
     private WebView webView;
     private JFXPanel panel;
     private final HashMap<String, Rectangle> positions = new HashMap<>();
-    private Integer tex = null;
+    private final HashMap<String, Integer> texes = new HashMap<>();
     private BufferedImage source;
     private Graphics sourceGraphics;
     private boolean painting = false;
 
-    private int texW;
-    private int texH;
+    private final HashMap<String, Integer> texesW = new HashMap<>();
+    private final HashMap<String, Integer> texesH = new HashMap<>();
+
+    private boolean finished;
 
     public ProjectionWebView(CanvasDelegate delegate) {
         this.delegate = delegate;
@@ -54,6 +56,10 @@ public class ProjectionWebView implements Projectable {
 
     @Override
     public void paintComponent(GLFWGraphicsAdapter g, VirtualScreen vs) {
+        if (finished) {
+            return;
+        }
+
         if (!painting) {
             painting = true;
 
@@ -108,6 +114,8 @@ public class ProjectionWebView implements Projectable {
             GL20.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
             GL11.glEnable(GL11.GL_TEXTURE_2D);
 
+            Integer tex = texes.get(vs.getVirtualScreenId());
+
             if (tex == null) {
                 tex = g.getProvider().dequeueTex();
 
@@ -117,6 +125,7 @@ public class ProjectionWebView implements Projectable {
                 GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
 
                 GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+                texes.put(vs.getVirtualScreenId(), tex);
             }
 
             GL11.glPushMatrix();
@@ -127,10 +136,13 @@ public class ProjectionWebView implements Projectable {
 
             GL30.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, buffer);
 
+            Integer texW = texesW.get(vs.getVirtualScreenId());
+            Integer texH = texesH.get(vs.getVirtualScreenId());
+
             if (width != texW || height != texH) {
                 GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
-                texW = width;
-                texH = height;
+                texesW.put(vs.getVirtualScreenId(), width);
+                texesH.put(vs.getVirtualScreenId(), height);
             } else {
                 GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0L);
             }
@@ -212,6 +224,8 @@ public class ProjectionWebView implements Projectable {
 
     @Override
     public void init() {
+        finished = false;
+
         if (webView == null) {
             webView = new WebView();
 
@@ -253,7 +267,14 @@ public class ProjectionWebView implements Projectable {
 
     @Override
     public void finish() {
+        finished = true;
 
+        delegate.getVirtualScreens().forEach(vs -> {
+            Integer tex = texes.remove(vs.getVirtualScreenId());
+            if (tex != null) {
+                delegate.runOnProvider(vs, provider -> provider.freeTex(tex));
+            }
+        });
     }
 
     public WebView getWebView() {
